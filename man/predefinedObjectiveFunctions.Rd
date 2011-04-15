@@ -4,11 +4,13 @@
 \alias{reclassWeightedError}
 \alias{reclassSensitivity}
 \alias{reclassSpecificity}
+\alias{reclassConfusion}
 \alias{cvError}
 \alias{cvErrorVariance}
 \alias{cvWeightedError}
 \alias{cvSensitivity}
 \alias{cvSpecificity}
+\alias{cvConfusion}
 \title{
 Predefined objective functions for parameter tuning
 }
@@ -20,6 +22,7 @@ reclassError()
 reclassWeightedError()
 reclassSensitivity(caseClass)
 reclassSpecificity(caseClass)
+reclassConfusion(trueClass, predictedClass)
 cvError(nfold = 10, ntimes = 10, 
         leaveOneOut = FALSE, stratified=FALSE)
 cvErrorVariance(nfold = 10, ntimes = 10, 
@@ -30,6 +33,9 @@ cvSensitivity(nfold = 10, ntimes = 10,
               leaveOneOut = FALSE, stratified=FALSE, caseClass)
 cvSpecificity(nfold = 10, ntimes = 10, 
               leaveOneOut = FALSE, stratified=FALSE, caseClass)
+cvConfusion(nfold = 10, ntimes = 10, 
+            leaveOneOut = FALSE, stratified=FALSE,
+            trueClass, predictedClass)
 }
 \arguments{
   \item{nfold}{
@@ -47,15 +53,23 @@ If set to true, a stratified cross-validation is carried out. That is, the perce
 }
 
   \item{caseClass}{The class containing the positive samples for the calculation of specificity and sensitivity. All samples with different class labels are regarded as controls (negative samples).}
+
+  \item{trueClass}{
+When calculating the confusion of two classes, the class to which a sample truly belongs.
+}
+
+  \item{predictedClass}{
+When calculating the confusion of two classes, the class to which a sample is erreneously assigned.
+}
 }
 \details{
 The functions do not calculate the objectives, but return a structure of class \code{TuneParetoObjectives} that provides all information on the objective function for later use in \code{\link{tunePareto}}.
 
 The behaviour of the functions in \code{\link{tunePareto}} is as follows:
 
-The reclassification functions train the classifiers with the full data set. Afterwards, the classifiers are applied to the same data set. \code{reclassError} measures the fraction of misclassified samples, \code{reclassWeightedError} calculates the sum of fractions of misclassified samples in each class weighted by the class size. \code{reclassSensitivity} measures the sensitivity, and \code{reclassSpecificity} measures the specificity of the reclassification experiment. \code{reclassError} and \code{reclassWeightedError} are minimization objectives, whereas \code{reclassSensitivity} and \code{reclassSpecificity} are maximization objectives.
+The reclassification functions train the classifiers with the full data set. Afterwards, the classifiers are applied to the same data set. \code{reclassError} measures the fraction of misclassified samples, \code{reclassWeightedError} calculates the sum of fractions of misclassified samples in each class weighted by the class size. \code{reclassSensitivity} measures the sensitivity, and \code{reclassSpecificity} measures the specificity of the reclassification experiment. \code{reclassConfusion} calculates the fraction of samples in \code{trueClass} that have been confused with \code{predictedClass}. \code{reclassError}, \code{reclassWeightedError} and \code{reclassConfusion} are minimization objectives, whereas \code{reclassSensitivity} and \code{reclassSpecificity} are maximization objectives.
 
-The cross-validation functions partition the samples in the data set into a number of groups (depending on \code{nfold} and \code{leaveOneOut}). Each of these groups is left out once in the training phase and used for prediction. The whole procedure is usually repeated several times (as specified in \code{ntimes}), and the results are averaged. Similar to the reclassification functions, \code{cvError} calculates the average fraction of misclassified samples over the runs, and \code{cvWeightedError} calculates the mean sum of fractions of misclassified samples in each class weighted by the class size. \code{cvErrorVariance} calculates the variance of the cross-validation error. \code{cvSensitivity} calculates the average sensitivity and \code{cvSpecificity} calculates the average specificity. \code{cvError}, \code{cvWeightedError} and \code{cvErrorVariance} are minimization objectives, and \code{cvSensitivity} and \code{cvSpecificity} are maximization objectives.
+The cross-validation functions partition the samples in the data set into a number of groups (depending on \code{nfold} and \code{leaveOneOut}). Each of these groups is left out once in the training phase and used for prediction. The whole procedure is usually repeated several times (as specified in \code{ntimes}), and the results are averaged. Similar to the reclassification functions, \code{cvError} calculates the average fraction of misclassified samples over the runs, and \code{cvWeightedError} calculates the mean sum of fractions of misclassified samples in each class weighted by the class size. \code{cvErrorVariance} calculates the variance of the cross-validation error. \code{cvSensitivity} calculates the average sensitivity and \code{cvSpecificity} calculates the average specificity. \code{cvConfusion} calculates the average fraction of samples in \code{trueClass} that have been confused with \code{predictedClass}. \code{cvError}, \code{cvWeightedError}, \code{cvErrorVariance} and \code{cvConfusion} are minimization objectives, and \code{cvSensitivity} and \code{cvSpecificity} are maximization objectives.
 }
 \value{
 An object of class \code{TuneParetoObjective} representing the objective function. For more details, see \code{\link{createObjective}}.
@@ -71,9 +85,10 @@ objectiveFunctions <- list(cvError(10, 10),
                            reclassSpecificity(caseClass="setosa"), 
                            reclassSensitivity(caseClass="setosa"))
 
-# pass them to tunePareto.knn
-print(tunePareto.knn(data = iris[, -ncol(iris)], 
+# pass them to tunePareto
+print(tunePareto(data = iris[, -ncol(iris)], 
                  labels = iris[, ncol(iris)],
+                 classifier = tunePareto.knn(),
                  k = c(3,5,7,9),
                  objectiveFunctions = objectiveFunctions))
 }

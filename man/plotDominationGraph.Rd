@@ -5,7 +5,7 @@
 Visualize the Pareto fronts of parameter configuration scores
 }
 \description{
-Draws the Pareto fronts and domination relations of tested parameter configurations in a graph. Here, the leftmost column of nodes represents the non-dominated configurations (i.e. the first Pareto front). The second column contains the second Pareto front, i.e. the configurations that are only dominated by the first Pareto front, and so on. An edge between two configurations indicate that the first configuration dominates the second.
+Draws the Pareto fronts and domination relations of tested parameter configurations in a graph. Here, the leftmost column of nodes represents the non-dominated configurations (i.e. the first Pareto front). The second column contains the second Pareto front, i.e. the configurations that are only dominated by the first Pareto front, and so on. An edge between two configurations indicate that the first configuration is dominated by the second.
 }
 \usage{
 plotDominationGraph(tuneParetoResult, 
@@ -22,7 +22,7 @@ plotDominationGraph(tuneParetoResult,
 An object of class \code{TuneParetoResult} as returned by \code{\link{tunePareto}}.
 }
   \item{transitiveReduction}{
-If this is true, transitive edges in the graph are removed to enhance readability. That is, if configuration \code{c1} dominates configuration \code{c2} and \code{c2} dominates \code{c3}, no edge from \code{c1} to \code{c3} is drawn.
+If this is true, transitive edges in the graph are removed to enhance readability. That is, if configuration \code{c1} dominates configuration \code{c2} and \code{c2} dominates \code{c3}, no edge from \code{c3} to \code{c1} is drawn.
 }
   \item{drawDominatedObjectives}{
 If set to true, color indicators are drawn next to the nodes. Here, each color corresponds to one objective. The color is drawn next to a node if this node has the best score in this objectives among all solutions of the same Pareto front (i.e., column of the graph).
@@ -51,13 +51,15 @@ Invisibly returns the \code{igraph} object representing the graph.
 \code{\link{tunePareto}}
 }
 \examples{
-# call tunePareto.knn with different k and l on the 'iris' data set
-x <- tunePareto.knn(data = iris[, -ncol(iris)], 
-                 labels = iris[, ncol(iris)],
-                 k = c(5,7,9),
-                 l = c(1,2,3),
-                 objectiveFunctions=list(cvError(10, 10),
-                                         cvSpecificity(10, 10, caseClass="setosa")))
+# call tunePareto using a k-NN classifier 
+# with different 'k' and 'l' on the 'iris' data set
+x <- tunePareto(data = iris[, -ncol(iris)], 
+                labels = iris[, ncol(iris)],
+                classifier = tunePareto.knn(),
+                k = c(5,7,9),
+                l = c(1,2,3),
+                objectiveFunctions=list(cvError(10, 10),
+                                        cvSpecificity(10, 10, caseClass="setosa")))
 
 # plot the graph                 
 \donttest{plotDominationGraph(x)}

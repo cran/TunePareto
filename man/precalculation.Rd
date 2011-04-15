@@ -10,18 +10,10 @@ These predefined precalculation functions can be employed to create own objectiv
 }
 \usage{
 reclassification(data, labels, 
-                 classifier, classifierParams,
-                 predictor, predictorParams, 
-                 useFormula = FALSE, formulaName = "formula", 
-                 trainDataName = "x", trainLabelName = "y", 
-                 testDataName = "newdata", modelName = "object")
+                 classifier, classifierParams, predictorParams)
 
 crossValidation(data, labels, 
-                classifier, classifierParams,
-                predictor, predictorParams, 
-                useFormula = FALSE, formulaName = "formula", 
-                trainDataName = "x", trainLabelName = "y", 
-                testDataName = "newdata", modelName = "object", 
+                classifier, classifierParams, predictorParams, 
                 ntimes = 10, nfold = 10, 
                 leaveOneOut = FALSE, stratified = FALSE)
 }
@@ -33,38 +25,14 @@ The data set to be used for the precalculation. This is usually a matrix or data
 A vector of class labels for the samples in \code{data}.
 }
   \item{classifier}{
-The classification function to use. If \code{predictor} is \code{NULL}, this function is an all-in-one classification method that receives both training data and test data and returns the predicted labels for the test data. If \code{predictor} is not \code{NULL}, this is the training function of the classifier that builds a model from the training data. This model is then passed to \code{predictor} along with the test data to obtain the predicted labels for the test data.
-}
+A \code{TuneParetoClassifier} wrapper object containing the classifier to tune. A number of state-of-the-art classifiers are included in \pkg{TunePareto} \if{latex}{\cr} (see \code{\link{predefinedClassifiers}}). Custom classifiers can be employed using \code{\link{tuneParetoClassifier}}.}
 
   \item{classifierParams}{
-A named list of parameter assignments for the classifier.
-}
-
-  \item{predictor}{
-If the classification method consists of separate training and prediction functions, this points to the prediction function that receives a model and the test data as inputs and returns the predicted class labels.
+A named list of parameter assignments for the training routine of the classifier.
 }
 
   \item{predictorParams}{
-If \code{predictor != NULL}, a named list of parameter assignments for the predictor.
-}
-
-  \item{useFormula}{
-Set this to true if the classifier expects a formula to describe the relation between features and class labels. The formula itself is built automatically.
-}
-  \item{formulaName}{
-If \code{useFormula} is true, this is the name of the parameter of the classifier's training function that holds the formula.
-}
-  \item{trainDataName}{
-The name of the paramater of the classifier's training function that holds the training data. 
-}
-  \item{trainLabelName}{
-If \code{useFormula=FALSE}, the name of the paramater of the classifier's training function that holds the training labels. Otherwise, the training labels are added to the training data and supplied in parameter \code{trainDataName}.
-}
-  \item{testDataName}{
-If \code{predictor=NULL}, this is the name of the parameter of \code{classifier} that receives the test data. Otherwise, it is the parameter of \code{predictor} that holds the test data.
-}
-  \item{modelName}{
-If \code{predictor} is not NULL, this is the name of the parameter of \code{predictor} that receives the training model (i.e., the return value of \code{classifier}).
+If the classifier consists of separate training and prediction functions, a named list of parameter assignments for the predictor function.
 }
 
   \item{nfold}{
@@ -90,15 +58,15 @@ If set to true, a stratified cross-validation is carried out. That is, the perce
 }
 \value{
 \code{reclassification} returns a list with the following components:
-
+\describe{
 \item{trueLabels}{The original labels of the dataset as supplied in \code{labels}}
 \item{predictedLabels}{A vector of predicted labels of the data set}
-
+}
 \code{crossValidation} returns a nested list structure. At the top level, there is one list element for each run of the cross-validation. Each of these elements consists of a list of sub-structures for each fold. The sub-structures have the following components:
-
+\describe{
 \item{trueLabels}{The original labels of the test samples in the fold}
 \item{predictedLabels}{A vector of predicted labels of the test samples in the fold}
-
+}
 That is, for a cross-validation with \code{n} runs and \code{m} folds, there are \code{n} top-level lists, each having \code{m} sub-lists comprising the true labels and the predicted labels.
 }
 
@@ -147,11 +115,12 @@ cvFalsePositives <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, caseClass)
             name = "CV.FalsePositives"))                  
 }
 
-# use the objective in an svm cost parameter tuning on the 'iris' data set
-r <- tunePareto.svm(data = iris[, -ncol(iris)], 
-                    labels = iris[, ncol(iris)],
-                    cost=c(0.001,0.005,0.01,0.05,0.1,0.5,1,5,10,50),
-                    objectiveFunctions=list(cvFalsePositives(10, 10, caseClass="setosa")))
+# use the objective in an SVM cost parameter tuning on the 'iris' data set
+r <- tunePareto(data = iris[, -ncol(iris)], 
+                labels = iris[, ncol(iris)],
+                classifier = tunePareto.svm(),
+                cost = c(0.001,0.005,0.01,0.05,0.1,0.5,1,5,10,50),
+                objectiveFunctions=list(cvFalsePositives(10, 10, caseClass="setosa")))
 print(r)
 }
 

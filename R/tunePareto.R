@@ -2,128 +2,17 @@
 # Main TunePareto routines
 #################################################################
 
-# Trains a classifier with the data supplied in <trainData> (one sample per row)
-# and <trainLabels>, and returns a vector of predicted labels for <testData>.
-# <classifier> is the classifier training function. 
-# If <predictor> is empty, <classifier> is a combined training 
-# and prediction function. 
-# Otherwise, <predictor> specifies the prediction part of the classifier.
-# <parameters> are a set of parameters to be passed to <classifier>.
-# If <useFormula> is true, the classifier is supplied with a formula specifying the relation-
-# ship between the data and the classes in a parameter called <formulaName>, and
-# the class labels are automatically included in the training data frame.
-# <trainDataName>, <trainLabelName>, <testDataName>, and <modelName> specify the names
-# of the parameters of <classifier> and <predictor> for the training data, the training labels,
-# the test data, and the classification model respectively.
-callClassifier <- function(trainData, trainLabels, testData, classifier, classifierParams, 
-                           predictor, predictorParams,
-                           useFormula = FALSE, formulaName = "formula",
-                           trainDataName = "x", trainLabelName = "y", testDataName = "newData",
-                           modelName = "object")
-{
-  classifierParams <- lapply(classifierParams, unlist, recursive=FALSE)
-  predictorParams <- lapply(predictorParams, unlist, recursive=FALSE)
-  
-  if (missing(predictor) || is.null(predictor))
-  # empty predictor => combined train/predict method
-  {
-    # build parameter list
-    
-    if (useFormula)
-    {
-      trainData <- data.frame(trainLabels,trainData)
-      colnames(trainData)[1] <- "Class"
-      
-      testData <- as.data.frame(testData)
-      colnames(testData) <- colnames(trainData)[-1]
-      
-      paramList <- list(as.formula("Class ~ ."), trainData, testData)
-      names(paramList) <- c(formulaName, trainDataName, testDataName)
-    }
-    else
-    {
-      paramList <- list(trainData, trainLabels, testData)
-      names(paramList) <- c(trainDataName, trainLabelName, testDataName)
-    }
-    paramList <- c(paramList, as.list(classifierParams))
-    
-    # call classifier and return predicted labels
-    return(do.call(classifier, paramList))
-  }
-  else
-  # separate training and prediction methods
-  {
-    # build parameter list for training
-   
-    if (useFormula)
-    {
-      trainData <- data.frame(trainLabels,trainData)
-      colnames(trainData)[1] <- "Class"
-      
-      testData <- as.data.frame(testData)
-      colnames(testData) <- colnames(trainData)[-1]
-      
-      paramList <- list(as.formula("Class ~ ."), trainData)
-      names(paramList) <- c(formulaName, trainDataName)
-      
-    }
-    else
-    {  
-      paramList <- list(trainData, trainLabels)
-      names(paramList) <- c(trainDataName, trainLabelName)
-    }
-    paramList <- c(paramList, classifierParams)
-  
-    # train the classifier
-    model <- do.call(classifier, paramList)
-    
-    # build parameter list for testing
-    paramList <- list(model, testData)
-    names(paramList) <- c(modelName, testDataName)
-    paramList <- c(paramList, predictorParams)
-    
-    # predict the unknown samples
-    return(do.call(predictor, paramList))
-  }
-}
-
 # Calculates a matrix specifying which configuration is dominated by which other combination
 # based on a matrix of objective values <objectiveValues>.
 # <minimizeObjectives> is a Boolean vector specifying which of the objectives
 # are minimized.
-#
 # Returns a Boolean domination matrix.
 calculateDominationMatrix <- function(objectiveValues, minimizeObjectives)
 {
-  domination <- matrix(apply(objectiveValues, 1, function(val1)
-                # iterate over configurations
-                {
-                  apply(objectiveValues, 1, function(val2)
-                  # iterate over configurations
-                  {
-                    oneBetter <- FALSE
-                    dom <- sapply(1:length(minimizeObjectives),function(k)
-                                  # iterate over objectives
-                                 {
-                                   if ((minimizeObjectives[k] && 
-                                       val1[k] > val2[k]) ||
-                                       (!minimizeObjectives[k] && 
-                                       val1[k] < val2[k]))
-                                   {
-                                       oneBetter <<- TRUE
-                                       return(TRUE)
-                                   }
-                                   return((minimizeObjectives[k] && 
-                                       val1[k] >= val2[k]) ||
-                                       (!minimizeObjectives[k] && 
-                                       val1[k] <= val2[k]))
-                                 })
-                        return (all(dom) && oneBetter)                            
-                  })
-                }),ncol=nrow(objectiveValues))
+  domination <- .Call("calculateDominationMatrix",as.numeric(as.matrix(objectiveValues)), as.integer(minimizeObjectives))
   rownames(domination) <- rownames(objectiveValues)              
   colnames(domination) <- rownames(objectiveValues)
-  return(domination)                
+  return(domination)  
 }
 
                           
@@ -131,46 +20,52 @@ calculateDominationMatrix <- function(objectiveValues, minimizeObjectives)
 # <data> is a dataset to use for tuning, where each row of the dataset
 # corresponds to one sample. 
 # <labels> are the corresponding class labels.
-# <classifier> is the classifier training function. 
-# If <predictor> is empty, <classifier> is a combined training 
-# and prediction function. 
-# Otherwise, <predictor> specifies the prediction part of the classifier.
-# <classifierParameterRanges> and <predictorParameterRanges> are lists of parameter values to test. 
-# Each element of the list must name a parameter of <classifier> or <predictor> respectively and consist 
-# of a sub-list of possible values for this parameter.
-# Alternatively, the complete lists of parameters can be specified in <classifierParameterCombinations>
-# and <predictorParameterCombinations>.
-# If <numCombinations> is specified, only a subsample of <numCombination> parameter
-# combination is tested. 
+# <classifier> is the classifier wrapper object. 
+# Parameters to be tuned can be supplied in ...
+# Alternatively, the complete lists of parameters can be specified in <parameterCombinations>
+# If <sampleType> is not "full" or "evolution", only a subsample of <numCombination> parameter
+# combinations is drawn using the specified sampling technique. 
+# For <sampleType="evolution">, the number of individuals <mu> and offspring <lambda> and the number
+# of generations <numIterations> can be specified.
 # <objectiveFunctions> is a list of objective functions, i.e. objects of class TuneParetoObjective.
+# <objectiveBoundaries> is a vector of lower/upper bounds for the objectives.
 # If <keepSeed> is true, all parameter configurations are tested with the same random seed.
 # If <useSnowfall> is true, parameter configurations are evaluated in parallel using snowfall.
-# If <useFormula> is true, the classifier is supplied with a formula specifying the relation-
-# ship between the data and the classes in a parameter called <formulaName>, and
-# the class labels are automatically included in the training data frame.
-# <trainDataName>, <trainLabelName>, <testDataName>, and <modelName> specify the names
-# of the parameters of <classifier> and <predictor> for the training data, the training labels,
-# the test data, and the classification model respectively.
+# If <verbose> is true, status information is printed
 # 
 # Returns a set of Pareto-optimal parameter assignments and the corresponding
-# objective function values. If <numCombinations> is specified, a complete list of tested
-# combinations is returned as well.
-tunePareto <- function(data, labels, 
-                      classifier, classifierParameterRanges, classifierParameterCombinations,
-                      predictor, predictorParameterRanges, predictorParameterCombinations,
-                      numCombinations, objectiveFunctions, objectiveBoundaries,
-                      keepSeed = TRUE, useSnowfall=FALSE, verbose=TRUE,
-                      useFormula = FALSE, formulaName = "formula",                      
-                      trainDataName = "x", trainLabelName = "y", 
-                      testDataName = "newdata",modelName = "object")
+# objective function values. 
+tunePareto <- function(..., data, labels, 
+                       classifier, parameterCombinations,
+                       sampleType=c("full","uniform","latin","halton","niederreiter","sobol","evolution"), 
+                       numCombinations, 
+                       mu=10, lambda=20, numIterations=100,
+                       objectiveFunctions, objectiveBoundaries,
+                       keepSeed = TRUE, useSnowfall=FALSE, verbose=TRUE)
 {
+  sampleType <- match.arg(sampleType, c("full","uniform","latin","halton","niederreiter","sobol","evolution"))
+  
+  if ((sampleType %in% c("uniform","latin","halton","niederreiter","sobol")) &&
+      (missing(numCombinations) || is.null(numCombinations)))
+    stop("For sampleType=\"uniform\",\"latin\",\"halton\",\"niederreiter\" or \"sobol\", you must specify numCombinations!")
 
-  # standardize labels
-  #classes <- sort(unique(labels))
-  #newLabels <- rep(NA,length(labels))
-  #for (i in 1:length(classes))
-  #  newLabels[which(labels == classes[i])] <- i
-  #labels <- as.factor(newLabels)
+  if(!inherits(classifier, "TuneParetoClassifier"))
+    stop("\"classifier\" must be a TuneParetoClassifier object!")
+  
+  if (length(labels) != nrow(data))
+    stop("Dimensions of data matrix and class label vector are incompatible!")
+  
+  if (useSnowfall)
+  {
+     require(snowfall)
+    
+    # export libraries needed in the cluster
+    sfLibrary("snowfall", character.only=TRUE)
+    sfLibrary("TunePareto", character.only=TRUE)
+    
+    if (length(classifier$requiredPackages) > 0)
+      lapply(classifier$requiredPackages,function(package)sfLibrary(package, character.only=TRUE))
+  }
   
   labels <- as.factor(as.character(labels))
  
@@ -179,53 +74,60 @@ tunePareto <- function(data, labels,
     if (length(objectiveBoundaries) != length(objectiveFunctions))
         stop("Please supply exactly one boundary for each objective function!")
   }
- 
-  if (missing(classifierParameterRanges))
-  {
-    if (!missing(predictorParameterRanges) || missing (classifierParameterCombinations))
-      stop(paste("Please provide either classifierParameterRanges/predictorParameterRanges or",
-                 "classifierParameterCombinations/predictorParameterCombinations!"))
-    
-    if (missing(predictorParameterCombinations))
-      combinations <- lapply(classifierParameterCombinations,function(x)list(classifierParams=x,
-                                                                             predictorParams=NULL))
-    else
-      combinations <- unlist(lapply(classifierParameterCombinations, function(comb1)
-                              {
-                                lapply(predictorParameterCombinations,function(comb2)
-                                {
-                                  list(classifierParams=comb1, predictorParams=comb2)
-                                })
-                              }), recursive=FALSE)
 
-    if (!missing(numCombinations) && !is.null(numCombinations))
-      combinations <- combinations[sample(1:length(combinations), size=numCombinations, replace=FALSE)]
-                              
-    meaningfulParams <- NULL       
+
+  args <- list(...)
+
+  if (length(args) == 0)
+  {
+    if (missing (parameterCombinations))
+      stop(paste("Please provide either parameterCombinations or",
+                 "parameter values in the ... argument!"))
+    
+    if (sampleType != "full")
+      stop(paste("parameterCombinations can only be used with sampleType=\"full\"!"))
+    
+    
+    # determine which parameters belong to the classifier and predictor respectively
+    combinations <- parameterCombinations
+    classifierParamPos <- intersect(names(parameterCombinations[[1]]),classifier$classifierParamNames)
+    predictorParamPos <- intersect(names(parameterCombinations[[1]]),classifier$predictorParamNames)
+                             
+    meaningfulParams <- NULL
   }
   else
   {
-    if (missing(predictorParameterRanges))
-      predictorParameterRanges <- NULL
-      
+    nonmatch <- setdiff(names(args), c(classifier$classifierParamNames,classifier$predictorParamNames))
+    
+    if (length(nonmatch) > 0)
+      stop("The following unknown parameters have been specified: ",nonmatch)
+
+    if (sampleType == "full" && any(sapply(args,is.interval)))
+      stop("For sampleType=\"full\", no intervals can be specified!")
+
+    # determine which parameters belong to the classifier and predictor respectively
+    classifierParamPos <- intersect(names(args),classifier$classifierParamNames)
+    predictorParamPos <- intersect(names(args),classifier$predictorParamNames)
       
     # in the description of parameter configurations, use only those parameter that do not have a fixed value
-    meaningfulParams <- unlist(c(sapply(classifierParameterRanges,function(param)length(param)>1),
-                               sapply(predictorParameterRanges,function(param)length(param)>1)))  
+    meaningfulParams <- sapply(args,function(param)length(param)>1)
     
     # determine the combinations to be tested
-    if (missing(numCombinations) || is.null(numCombinations))
-      combinations <- allCombinations(append(classifierParameterRanges, 
-                                             predictorParameterRanges))
-    else
-      combinations <- sampleCombinations(append(classifierParameterRanges, 
-                                                predictorParameterRanges), numCombinations)
+    # using the corresponding sampling technique
+    combinations <- 
+        switch(sampleType,
+               full = allCombinations(args),
+               latin = latinHypercube(args, numCombinations),
+               evolution = NULL,
+               sampleCombinations(args, numCombinations, method=sampleType))
   }
   
   # group objective functions that have the same precalculation routine
   # to save computational time
   groups <- groupByPrecalculation(objectiveFunctions)
   groupedObjectives <- groups$grouping
+  
+  minimizeObjectives <- sapply(objectiveFunctions,function(x)x$minimize)
 
   if (verbose)
     cat("Testing parameter combinations...\n")
@@ -234,15 +136,16 @@ tunePareto <- function(data, labels,
   runif(n=1)  
   seed <- .Random.seed
   
+  # internal function that calculates the objective values
+  # for a set of parameter values
   calculateObjectiveVals <- function(parameters)
     {
        if (verbose)
        {
          if (is.null(meaningfulParams))
          {
-           allParams <- unlist(unname(parameters), recursive=FALSE)
            cat("Evaluating parameter set:",
-                paste(paste(names(allParams),"=",allParams), collapse=", "),"\n")
+                paste(paste(names(parameters),"=",parameters), collapse=", "),"\n")
          }
          else
          {
@@ -262,100 +165,222 @@ tunePareto <- function(data, labels,
                 }  
                 # build parameter list for precalculation
                 
-                if (is.null(meaningfulParams))
-                {
-                  # If there are pre-specified parameter lists,
-                  # the parameters for classifiers and predictors are
-                  # supplied in two sub-lists
-                  classifierParams <- parameters$classifierParams
-                  predictorParams <- parameters$predictorParams
-                }
-                else
-                {
-                  # if all combinations were generated automatically, parameters for classifiers and
-                  # predictors are stored in the same list
-                  classifierParams <- parameters[1:length(classifierParameterRanges)]
-                  predictorParams <- parameters[-(1:length(classifierParameterRanges))]
-                }
+                classifierParams <- parameters[classifierParamPos]
+                predictorParams <- parameters[predictorParamPos]
                 
-                params <- list(data, labels, classifier, classifierParams, 
-                               predictor, predictorParams,
-                               useFormula, formulaName, trainDataName, trainLabelName, 
-                               testDataName, modelName)
-                names(params) <- c("data", "labels", "classifier", "classifierParams",
-                                   "predictor", "predictorParams", 
-                                   "useFormula", "formulaName",
-                                   "trainDataName", "trainLabelName",
-                                   "testDataName", "modelName")
+                params <- list(data, labels, classifier, classifierParams, predictorParams)
+                names(params) <- c("data", "labels", "classifier", "classifierParams", "predictorParams")
                 
                 params <- c(params, as.list(objective$precalculationParams))
                 
-                # call precalculation
-                precalc <- do.call(objective$precalculationFunction,params)             
-
-                # call associated objective functions
-                if (is.function(objective$objectiveFunction))
-                {                                 
-                  do.call(objective$objectiveFunction,
-                          append(list(result=precalc), objective$objectiveFunctionParams))
-		                
-		            }
-                else
+                tryCatch(
                 {
-                    
-                  mapply(function(func, params)
-                         {
-                            do.call(func, append(list(result=precalc),unlist(params,recursive=FALSE)))
-                         }, objective$objectiveFunction, objective$objectiveFunctionParams)
-                 }
-                
+                   # call precalculation
+                  precalc <- do.call(objective$precalculationFunction,params)             
+
+                  # call associated objective functions
+                  if (is.function(objective$objectiveFunction))
+                  {                                 
+                    return(do.call(objective$objectiveFunction,
+                            append(list(result=precalc), objective$objectiveFunctionParams)))
+		                  
+		              }
+                  else
+                  {
+                      
+                    return(mapply(function(func, params)
+                           {
+                              do.call(func, append(list(result=precalc),unlist(params,recursive=FALSE)))
+                           }, objective$objectiveFunction, objective$objectiveFunctionParams))
+                   }
+                 },
+                 error = function(e)
+                 {
+                   # an error occurred for the parameter combination
+                   allParams <- unlist(parameters, recursive=FALSE)
+                   warning(paste("Combination",
+                           paste(paste(names(allParams),"=",allParams), collapse=", "),"returned an error:",e))
+                   if (is.function(objective$objectiveFunction))
+                     NA
+                   else
+                     rep(NA,length(objective$objectiveFunction))
+                 })
               }))
          return(res)
       }
   
-  if (useSnowfall)
+  if (sampleType == "evolution")
+  # switch to Evolution Strategies
   {
-    require(snowfall)
+    # initialize individuals and mutation rates
+    mutationRates <- sapply(args,function(range)
+                            {
+                              if (is.interval(range))
+                              {
+                                (range$upper - range$lower)/100
+                              }
+                              else
+                                NA
+                            })
+                            
+    individuals <- lapply(latinHypercube(args,N=mu), function(ind)
+                            list(individual=ind,mutation=mutationRates))
     
-     # export objects and functions needed in the cluster
-    sfLibrary("snowfall", character.only=TRUE)
-    sfLibrary("TunePareto", character.only=TRUE)
-    sfExport("data","labels","classifier","predictor",
-             "useFormula", "formulaName","trainDataName", "trainLabelName",
-             "testDataName", "modelName","keepSeed","seed",
-             "groupedObjectives","useSnowfall","verbose","meaningfulParams")
-             
-    # sfExport("callClassifier", namespace="TunePareto")
+    # calculate initial fitness
+    if (useSnowfall)
+    { 
+      # export objects and functions needed in the cluster   
+      sfExport("data","labels","classifier","keepSeed","seed",
+               "groupedObjectives","useSnowfall","verbose","meaningfulParams")
+               
+      # parallel evaluation of combinations in cluster
+      oldObjectiveValues <- t(sfSapply(individuals, function(cand)calculateObjectiveVals(cand$individual)))
+    }
+    else
+    {
+      # sequential evaluation of combinations
+      oldObjectiveValues <- t(sapply(individuals, function(cand)calculateObjectiveVals(cand$individual)))
+    }
     
-    # parallel evaluation of combinations in cluster
-    objectiveValues <- t(sfSapply(combinations, calculateObjectiveVals))
+    for (i in 1:numIterations)
+    # iterate for <numIterations> generations
+    {
+      if (verbose)
+        cat("Iteration ",i,"\n",sep="")
+      
+      # calculate crowding distances      
+      crowd <- apply(oldObjectiveValues,2,function(dim)
+         {
+          idx <- order(dim)
+          dim <- dim[idx]
+          
+          res <- sapply(1:length(dim),function(i)
+                 {
+                  if (i == 1)
+                    dim[2]-dim[1]
+                  else
+                  if (i == length(dim))
+                    dim[length(dim)]-dim[length(dim) - 1]
+                  else
+                    mean(c(dim[i]-dim[i-1],dim[i+1]-dim[i]))
+                 })
+          revidx <- order(idx)
+          return(res[revidx])
+        })
+      crowd <- apply(crowd,1,mean)
+      
+      # mating probability is based on the rank
+      # of the crowding distance
+      crowdProbs <- rank(crowd)
+      crowdProbs <- crowdProbs/sum(crowdProbs)      
+      
+      # create offspring  
+      candidates <- lapply(1:lambda, function(i)
+                    {
+                      parents <- sample(1:length(individuals),size=2,replace=FALSE,prob=crowdProbs)
+                      mutate(recombine(individuals[[parents[1]]],individuals[[parents[2]]]),
+                             args)
+                    })
+      
+      # calculate fitness of offspring
+      if (useSnowfall)
+      { 
+        # export objects and functions needed in the cluster   
+        sfExport("data","labels","classifier","keepSeed","seed",
+                 "groupedObjectives","useSnowfall","verbose","meaningfulParams")
+                 
+        # parallel evaluation of combinations in cluster
+        objectiveValues <- rbind(oldObjectiveValues,
+                                 t(sfSapply(candidates, function(cand)calculateObjectiveVals(cand$individual))))
+      }
+      else
+      {
+        # sequential evaluation of combinations
+        objectiveValues <- rbind(oldObjectiveValues,
+                                 t(sapply(candidates, function(cand)calculateObjectiveVals(cand$individual))))
+      }
+      
+      candidates <- c(individuals, candidates)
+      
+      # non-dominated sorting on candidates
+      dominationMatrix <- calculateDominationMatrix(objectiveValues[, groups$permutation], minimizeObjectives)
+      fronts <- calculateParetoFronts(dominationMatrix)
+      
+      remaining <- mu
+      indices <- c()
+      for (front in fronts)
+      {
+        if (remaining < length(front))
+        {
+          indices <- c(indices, sample(front,size=remaining,replace=FALSE))
+          break
+        }
+        else
+        {
+          indices <- c(indices, front)
+          remaining <- remaining - length(front)
+        }
+      }
+      
+      individuals <- candidates[indices]
+      oldObjectiveValues <- objectiveValues[indices,,drop=FALSE]
+    }
+    
+    # remove duplicate parameter configurations
+    combinations <- lapply(candidates,function(ind)ind$individual)
+    dup <- duplicated(combinations)
+    combinations <- combinations[!dup]
+    
   }
   else
   {
-    # sequential evaluation of combinations
-    objectiveValues <- t(sapply(combinations, calculateObjectiveVals))
+    if (useSnowfall)
+    { 
+      # export objects and functions needed in the cluster   
+      sfExport("data","labels","classifier","keepSeed","seed",
+               "groupedObjectives","useSnowfall","verbose","meaningfulParams")
+               
+      # parallel evaluation of combinations in cluster
+      objectiveValues <- t(sfSapply(combinations, calculateObjectiveVals))
+    }
+    else
+    {
+      # sequential evaluation of combinations
+      objectiveValues <- t(sapply(combinations, calculateObjectiveVals))
+    }
   }
   
+  # calculate optimal combinations
   if (verbose)
     cat("Calculating Pareto-optimal combinations...\n")
  
   objectiveValues <- matrix(objectiveValues, nrow=length(combinations))[, groups$permutation, drop=FALSE]
+  
+  invalidEntries <- apply(objectiveValues,1,function(row)any(is.na(row)))
+  objectiveValues <- objectiveValues[!invalidEntries,,drop=FALSE]
+  combinations <- combinations[!invalidEntries]
                          
   colnames(objectiveValues) <- sapply(objectiveFunctions,function(obj)obj$name)                        
-  
+    
   rownames(objectiveValues) <- sapply(combinations, 
                                       function(comb)
                                       {
                                           if (!is.null(meaningfulParams))
                                             comb <- comb[meaningfulParams]
-                                          else
-                                            comb <- unlist(unname(comb), recursive=FALSE)
+                                          
+                                          comb <- sapply(comb,function(x)
+                                                        {
+                                                          if  (is.numeric(x) && round(x) != x)
+                                                            sprintf("%.5g",x)
+                                                          else
+                                                            as.character(x)
+                                                        })  
                                           paste(paste(names(comb),"=",comb), collapse=", ")
                                       })
+                                      
+  names(minimizeObjectives) <- colnames(objectiveValues)                                      
 
   # calculate a matrix specifying which configuration is dominated by which other combination
-  minimizeObjectives <- sapply(objectiveFunctions,function(x)x$minimize)
-  names(minimizeObjectives) <- colnames(objectiveValues)
   domination <- calculateDominationMatrix(objectiveValues, minimizeObjectives)
   
   # determine dominated/non-dominated solutions              
@@ -368,6 +393,9 @@ tunePareto <- function(data, labels,
                  {
                   any(mapply(function(v, bound, minimize)
                       {
+                        if (is.na(bound) || is.null(bound))
+                          FALSE
+                        else
                         if (minimize)
                           v > bound
                         else
@@ -389,10 +417,173 @@ tunePareto <- function(data, labels,
   return(res)  
 }
 
+# Recombination method for two parents <parent1> and <parent2>
+# in the Evolution Strategies
+recombine <- function(parent1, parent2)
+{
+  # recombine parameter values
+  child <- mapply(function(gene1, gene2, mut)
+                  {
+                     
+                     if (!is.na(mut))
+                     # this is a continuous gene
+                     {
+                       mean(gene1,gene2)
+                     }
+                     else
+                     # this is a discrete gene
+                     {
+                       sample(c(gene1,gene2),size=1)
+                     }
+                  }, parent1$individual, parent2$individual, parent1$mutation,
+                  SIMPLIFY=FALSE)
+                  
+  # recombine mutation rates
+  mutation <- mapply(function(mut1, mut2)
+                     {
+                       if (!is.na(mut1))
+                         mean(c(mut1,mut2))
+                       else
+                         NA
+                     },
+                     parent1$mutation,parent2$mutation)
+  return(list(individual=child,mutation=mutation))
+}
+
+# Mutation method for an individual in
+# the Evolution Strategies.
+# <ranges> specifies the possible values
+# for the parameters.
+mutate <- function(individual, ranges)
+{
+  # mutate the mutation rates
+  individual$mutation <- sapply(individual$mutation, function(mut)
+                               {
+                                 if (is.na(mut))
+                                   NA
+                                 else
+                                  mut * exp(rnorm(mean=0,sd=1/sqrt(2*length(individual$mutation)),n=1) +
+                                            rnorm(mean=0,sd=1/sqrt(2*sqrt(length(individual$mutation))),n=1))
+                               })
+  
+  # mutate the parameter values
+  individual$individual <- mapply(function(gene, mut, range)
+                                  {
+                                     if (!is.na(mut))
+                                     # this is a continuous gene
+                                     {
+                                       max(range$lower,
+                                           min(range$upper,gene + rnorm(mean=0,sd=mut,n=1)))
+                                     }
+                                     else
+                                     if (runif(n=1) < 1/length(ranges))
+                                     # perform a discrete mutation only with a small probability
+                                     {
+                                       if (!is.numeric(range))
+                                       # nominally scaled attribute
+                                       {
+                                         sample(range,size=1)
+                                       }
+                                       else
+                                       # integer attribute => choose from neighbourhood
+                                       {
+                                         idx <- which(range==gene)
+                                         if (idx == 1)
+                                           range[2]
+                                         else
+                                         if (idx == length(range))
+                                           range[idx-1]
+                                         else
+                                          sample(c(range[idx-1],range[idx+1]),size=1)
+                                       }
+                                     }
+                                     else
+                                       gene
+                                  },
+                                  individual$individual, 
+                                  individual$mutation,
+                                  ranges,
+                                  SIMPLIFY=FALSE)
+  return(individual)
+}
+
+# Recalculate the Pareto-optimal solutions of <tuneParetoResult>
+# using only the objectives specified in the index vector <objectives>.
+recalculateParetoSet <- function(tuneParetoResult, objectives)
+{
+  if(!inherits(tuneParetoResult, "TuneParetoResult"))
+    stop("\"tuneParetoResult\" must be a TuneParetoResult object!")
+  
+  if (missing(objectives))
+    objectives <- 1:length(tuneParetoResult$minimizeObjectives)
+  
+  combinations <- tuneParetoResult$testedCombinations
+  objectiveValues <- tuneParetoResult$testedObjectiveValues[,objectives,drop=FALSE]
+  minimizeObjectives <- tuneParetoResult$minimizeObjectives[objectives]
+  objectiveBoundaries <- tuneParetoResult$objectiveBoundaries[objectives]
+  
+  dominationMatrix <- calculateDominationMatrix(objectiveValues, minimizeObjectives)
+  
+  # determine dominated/non-dominated solutions              
+  dominated <- apply(dominationMatrix,2,any)
+  
+  if (!is.null(objectiveBoundaries))
+  {
+    dominated <- dominated | 
+                 apply(objectiveValues,1,function(val)
+                 {
+                  any(mapply(function(v, bound, minimize)
+                      {
+                        if (minimize)
+                          v > bound
+                        else
+                          v < bound
+                      }, val, objectiveBoundaries, minimizeObjectives))
+                 })
+  }
+
+  # build result list                                      
+  res <- list(bestCombinations=combinations[!dominated], 
+              bestObjectiveValues=objectiveValues[!dominated,,drop=FALSE],
+              testedCombinations=combinations,
+              testedObjectiveValues=objectiveValues,
+              minimizeObjectives = minimizeObjectives,
+              objectiveBoundaries =  objectiveBoundaries,
+              dominationMatrix=dominationMatrix)
+  class(res) <- "TuneParetoResult"  
+  return(res)
+}
+
+# Merges a list of TuneParetoResult objects
+# and calculates the common Pareto-optimal solutions.
+mergeTuneParetoResults <- function(...)
+{
+  l <- list(...)
+  
+  if (any(sapply(l,function(r)!inherits(r, "TuneParetoResult"))))
+    stop("All supplied arguments must be a TuneParetoResult object!")
+    
+  objectives <- lapply(l,function(r)colnames(r$testedCombinations))
+  if (length(unique(objectives)) != 1)
+    stop("All supplied TuneParetoResult objects must use the same objective functions!")
+    
+  res <- l[[1]]
+  for (el in l[2:length(l)])
+  {
+    res$testedCombinations <- c(res$testedCombinations, el$testedCombinations)
+    res$testedObjectiveValues <- rbind(res$testedObjectiveValues, el$testedObjectiveValues)
+  }
+  
+  return(recalculateParetoSet(res))  
+}
+
 # Print function for objects of class TuneParetoResult.
-# Prints the non-dominated solutions of <x>
+# Prints the non-dominated solutions of <x>.
 print.TuneParetoResult <- function(x, ...)
 { 
+  if(!inherits(x, "TuneParetoResult"))
+    stop("\"x\" must be a TuneParetoResult object!")
+    
   if (is.null(x$objectiveBoundaries))  
     cat("Pareto-optimal parameter sets:\n")
   else
@@ -400,286 +591,3 @@ print.TuneParetoResult <- function(x, ...)
   print(x$bestObjectiveValues)
   return(invisible(x))
 }
-
-# Wrapper for tunePareto that tunes a tree.
-# For parameters, see tunePareto and tree.
-tunePareto.tree <- function(data, labels,
-                            weights, subset,
-                            na.action,
-                            method,
-                            split,
-                            mincut, minsize, mindev,
-                            numCombinations,                 
-                            objectiveFunctions,
-                            objectiveBoundaries,
-                            keepSeed = TRUE,
-                            useSnowfall = FALSE,
-                            verbose=TRUE)
-{
-  if (useSnowfall)
-  {
-    require(snowfall)  
-    sfLibrary("tree", character.only=TRUE)
-  }
-  else
-    require(tree)
-    
-  paramRanges = list()
-  if (!missing(weights))
-    paramRanges$weights <- weights
-    
-  if (!missing(na.action))
-    paramRanges$na.action <- na.action
-    
-  if (!missing(method))
-    paramRanges$method <- method
-    
-  if (!missing(split))
-    paramRanges$split <- split
-
-  if (!missing(mincut))
-    paramRanges$mincut <- mincut
-    
-  if (!missing(minsize))
-    paramRanges$minsize <- minsize
-    
-  if (!missing(mindev))
-    paramRanges$mindev <- mindev
-    
-  if (missing(numCombinations))
-    numCombinations <- NULL
-    
-  tunePareto(data = data, 
-             labels = labels,
-             classifier = tree, 
-             predictor = predict, 
-             classifierParameterRanges = paramRanges,
-             predictorParameterRanges = list(type="class"),
-             numCombinations = numCombinations,
-             objectiveFunctions = objectiveFunctions,
-             objectiveBoundaries = objectiveBoundaries,
-             keepSeed = keepSeed,
-             useSnowfall = useSnowfall,
-             verbose = verbose,             
-             useFormula=TRUE,
-             formulaName="formula",
-             trainDataName="data",
-             testDataName="newdata",
-             modelName="object")        
-}
-
-# Wrapper for tunePareto that tunes a random forest.
-# For parameters, see tunePareto and randomForest.
-tunePareto.randomForest <- function(data, labels,
-                                    subset,
-                                    na.action,
-                                    ntree,
-                                    mtry,
-                                    replace, 
-                                    classwt, 
-                                    cutoff, 
-                                    strata,
-                                    sampsize,
-                                    nodesize,
-                                    maxnodes,
-                                    numCombinations,                 
-                                    objectiveFunctions,
-                                    objectiveBoundaries,                                    
-                                    keepSeed = TRUE,
-                                    useSnowfall = FALSE,
-                                    verbose=TRUE)
-{
-  if (useSnowfall)
-  {
-    require(snowfall)  
-    sfLibrary("randomForest", character.only=TRUE)
-  }
-  else
-    require(randomForest)
-    
-  paramRanges = list()
-  
-  if (!missing(subset))
-    paramRanges$subset <- subset
-    
-  if (!missing(na.action))
-    paramRanges$subset <- na.action
-  
-  if (!missing(mtry))
-    paramRanges$mtry <- mtry
-    
-  if (!missing(ntree))
-    paramRanges$ntree <- ntree
-    
-  if (!missing(replace))
-    paramRanges$replace <- replace
-    
-  if (!missing(classwt))
-    paramRanges$classwt <- classwt
-    
-  if (!missing(cutoff))
-    paramRanges$cutoff <- cutoff
-
-  if (!missing(strata))
-    paramRanges$strata <- strata
-    
-  if (!missing(sampsize))
-    paramRanges$sampsize <- sampsize
-    
-  if (!missing(nodesize))
-    paramRanges$nodesize <- nodesize
-    
-  if (!missing(maxnodes))
-    paramRanges$maxnodes <- maxnodes
-    
-  if (missing(numCombinations))
-    numCombinations <- NULL
-    
-  tunePareto(data = data, 
-             labels = labels,
-             classifier = randomForest, 
-             predictor = predict, 
-             classifierParameterRanges = paramRanges,
-             numCombinations = numCombinations,
-             objectiveFunctions = objectiveFunctions,
-             objectiveBoundaries = objectiveBoundaries,             
-             keepSeed = keepSeed,
-             useSnowfall = useSnowfall,
-             verbose = verbose,             
-             useFormula=TRUE,
-             trainDataName="data",
-             formulaName="formula",
-             testDataName="newdata",
-             modelName="object")        
-}
-
-
-# Wrapper for tunePareto that tunes a support vector machine.
-# For parameters, see tunePareto and svm
-tunePareto.svm <- function(data, labels,
-                           kernel, degree, gamma,
-                           coef0, cost, nu,
-                           class.weights, cachesize, 
-                           tolerance, epsilon,
-                           subset, na.action,
-                           numCombinations,                            
-                           objectiveFunctions,
-                           objectiveBoundaries,                           
-                           keepSeed = TRUE,
-                           useSnowfall = FALSE,
-                           verbose=TRUE)
-{
-  if (useSnowfall)
-  {
-    require(snowfall)
-    sfLibrary("e1071", character.only=TRUE)
-  }
-  else
-    require(e1071)
-    
-  paramRanges = list()
-  if (!missing(kernel))
-    paramRanges$kernel <- kernel
-    
-  if (!missing(degree))
-    paramRanges$degree <- degree
-    
-  if (!missing(gamma))
-    paramRanges$gamma <- gamma
-    
-  if (!missing(coef0))
-    paramRanges$coef0 <- coef0
-
-  if (!missing(cost))
-    paramRanges$cost <- cost
-    
-  if (!missing(nu))
-    paramRanges$nu <- nu
-    
-  if (!missing(class.weights))
-    paramRanges$class.weights <- class.weights
-    
-  if (!missing(cachesize))
-    paramRanges$cachesize <- cachesize
-    
-  if (!missing(tolerance))
-    paramRanges$tolerance <- tolerance
-    
-  if (!missing(epsilon))
-    paramRanges$epsilon <- epsilon
-
-  if (!missing(subset))
-    paramRanges$subset <- subset
-    
-  if (!missing(na.action))
-    paramRanges$na.action <- na.action
-    
-  if (missing(numCombinations))
-    numCombinations <- NULL    
-        
-  tunePareto(data = data,   
-             labels = labels,
-             classifier = svm, 
-             predictor = predict, 
-             classifierParameterRanges = paramRanges,
-             numCombinations = numCombinations,
-             objectiveFunctions = objectiveFunctions,
-             objectiveBoundaries = objectiveBoundaries,            
-             keepSeed = keepSeed,
-             useSnowfall = useSnowfall,
-             verbose = verbose,
-             useFormula = FALSE,
-             trainDataName = "x",
-             trainLabelName = "y",
-             testDataName = "newdata",
-             modelName = "object")
-}
-
-# Wrapper for tunePareto that tunes a k-Nearest Neighbour classifier.
-# For parameters, see tunePareto and knn.
-tunePareto.knn <- function(data, labels,
-                           k, l, use.all,
-                           numCombinations,                            
-                           objectiveFunctions,
-                           objectiveBoundaries,                           
-                           keepSeed = TRUE,
-                           useSnowfall = FALSE,
-                           verbose=TRUE)
-{
-  if (useSnowfall)
-  {
-    require(snowfall)
-    sfLibrary("class", character.only=TRUE)
-  }
-  else
-    require(class)
-    
-  paramRanges = list()
-  if (!missing(k))
-    paramRanges$k <- k
-    
-  if (!missing(l))
-    paramRanges$l <- l
-    
-  if (!missing(use.all))
-    paramRanges$use.all <- use.all
-    
-  if (missing(numCombinations))
-    numCombinations <- NULL    
-        
-  tunePareto(data = data, 
-             labels = labels,
-             classifier = knn, 
-             predictor = NULL, 
-             classifierParameterRanges = paramRanges,
-             numCombinations = numCombinations,
-             objectiveFunctions = objectiveFunctions,
-             objectiveBoundaries = objectiveBoundaries,
-             keepSeed = keepSeed,
-             useSnowfall = useSnowfall,
-             verbose = verbose,             
-             useFormula = FALSE,
-             trainDataName = "train",
-             testDataName = "test",
-             trainLabelName = "cl")
-}                           

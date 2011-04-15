@@ -10,6 +10,7 @@ Plots a matrix of Pareto front panels for each pair of objectives. The plot for 
 plotObjectivePairs(tuneParetoResult, 
                    drawLabels = TRUE, 
                    drawBoundaries = TRUE, 
+                   labelPos = 4, 
                    ...)
 }
 \arguments{
@@ -24,6 +25,10 @@ If set to true, the descriptions of the configurations are printed next to the p
 If set to true, the upper or lower objective limits supplied in the \code{objectiveBoundaries} parameter of \code{\link{tunePareto}} are drawn as horizontal and vertical lines.
 }
 
+  \item{labelPos}{
+The position of the configuration labels in the plot. Values of 1, 2, 3 and 4 denote positions below, to the left of, above and to the right of the points on the Pareto fronts.
+}  
+
   \item{...}{
 Further graphical parameters to be passed to the \code{\link{plot}} function.
 }
@@ -36,15 +41,16 @@ This function does not have a return value.
 \code{\link{tunePareto}}, \code{\link{plotParetoFronts2D}}, \code{\link{plotDominationGraph}}
 }
 \examples{
-# optimize the 'cost' parameter according
+# optimize the 'cost' parameter of an SVM according
 # to CV error, CV error variance, and CV Specificity 
 # on two classes of the 'iris' data set
-r <- tunePareto.svm(data = iris[, -ncol(iris)], 
-                   labels = iris[, ncol(iris)],
-                   cost=c(0.001,0.005,0.01,0.05,0.1,0.5,1,5,10,50), 
-                   objectiveFunctions=list(cvError(10, 10),
-                                           cvErrorVariance(10, 10),
-                                           cvSpecificity(10, 10, caseClass="virginica")))
+r <- tunePareto(data = iris[, -ncol(iris)], 
+                labels = iris[, ncol(iris)],
+                classifier = tunePareto.svm(),
+                cost=c(0.001,0.005,0.01,0.05,0.1,0.5,1,5,10,50), 
+                objectiveFunctions=list(cvError(10, 10),
+                                        cvErrorVariance(10, 10),
+                                        cvSpecificity(10, 10, caseClass="virginica")))
 
 # plot the matrix of Pareto fronts
 plotObjectivePairs(r)         

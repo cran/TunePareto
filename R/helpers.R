@@ -71,28 +71,103 @@ allCombinations <- function(parameterRanges)
    return(res)
 }
 
-# Draws a sample of <N> random parameter combinations from the
-# parameter values specified in <parameterRanges>.
-#
-# Returns the combination list
-sampleCombinations <- function(parameterRanges, N)
+# Draws a sample of <N> combinations from <parameterRanges>
+# using the specified sampling method.
+sampleCombinations <- function(parameterRanges, N, method=c("uniform","halton","niederreiter","sobol"))
 {
-  comb <- allCombinations(parameterRanges)
-  return(comb[sample(1:length(comb), size=N, replace=FALSE)])
-
-  #samples <- lapply(parameterRanges, function(param)
-  #                  {
-  #                    sample(param, size=N, replace=TRUE)
-  #                  })
-                    
-  #res <- lapply(1:N,function(i)
-  #              {
-  #                r <- lapply(1:length(parameterRanges), function(j)
-  #                {
-  #                  samples[[j]][[i]]
-  #                })
-  #                names(r) <- names(parameterRanges)
-  #                r
-  #              })
-  #return(res)                                 
+  # first, draw a set of values in [0,1]
+  numbers <- switch(match.arg(method,c("uniform","halton","niederreiter","sobol")),
+                    uniform = runif(n=length(parameterRanges)*N),
+                    halton = halton.sample(n=N, dimension=length(parameterRanges)),
+                    niederreiter = {
+                                      require(gsl)
+                                      pt <- qrng_alloc(type="niederreiter_2",dim=length(parameterRanges))
+                                      
+                                      # random initialization
+                                      qrng_get(pt,sample(1:1000,size=1))
+                                      t(qrng_get(pt, N))
+                                      
+                                   },
+                    sobol =        {
+                                      require(gsl)
+                                      pt <- qrng_alloc(type="sobol",dim=length(parameterRanges))
+                                      
+                                      # random initialization
+                                      qrng_get(pt,sample(1:1000,size=1))
+                                      t(qrng_get(pt, N))
+                                   }                                   
+                   )
+  numbers <- matrix(numbers,ncol=N)
+  
+  # apply the [0,1] values to the ranges of the parameters
+  res <- apply(numbers,2,function(col)
+                {
+                  x <- mapply(function(val,range)
+                  {
+                    if (is.interval(range))
+                    # interval => scaling
+                    {
+                     range$lower + (range$upper-range$lower) * val
+                    }
+                    else
+                    # discrete parameter => round to "grid"
+                    {
+                      if (val == 0)
+                        val <- 0.01
+                      range[ceiling(val * length(range))]
+                    }
+                  }, col, parameterRanges, SIMPLIFY=FALSE)
+                  names(x) <- names(parameterRanges)
+                  x
+                })
+  return(res)                
 }
+
+# Latin Hypercube sampling of <N> combinations from the
+# ranges supplied in <parameterRanges>
+latinHypercube <- function(parameterRanges, N)
+{
+  vals <- data.frame(lapply(parameterRanges,function(range)
+          {
+            if (is.interval(range))
+            # partition interval into <N> parts and take
+            # one value from each part
+            {
+              intSz <- (range$upper - range$lower)/N
+              lower <- cumsum(c(range$lower,rep(intSz,N-1)))
+              return(sample(sapply(lower,function(x)runif(min=x,max=x+intSz,n=1)),
+                            size=N,replace=FALSE))
+            }
+            else
+            # ensure that each discrete value occurs equally often (+-1)
+            {
+              if (N %% length(range) == 0)
+                reps <- N %/% length(range)
+              else
+                reps <- N %/% length(range) + 1
+              return(sample(rep(range,reps),size=N,replace=FALSE))
+            }
+          }),stringsAsFactors=FALSE)
+  return(lapply(1:nrow(vals),function(i)
+            {
+              x <- as.list(vals[i,])
+              names(x) <- names(parameterRanges)
+              x
+            }))
+}
+
+# Creates an interval object from
+# a lower and an upper bound.
+as.interval <- function(lower,upper)
+{
+  l <- list(lower=lower,upper=upper)
+  class(l) <- "Interval"
+  return(l)
+}
+
+# Check whether an object is an interval.
+is.interval <- function(x)
+{
+  return(inherits(x,"Interval"))
+}
+

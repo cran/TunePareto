@@ -25,7 +25,8 @@ Returns a list of lists, where each of the inner lists represents one parameter 
 \examples{
 
 library(class)
-# Combine only valid combinations of k and l:
+# Combine only valid combinations of 'k' and 'l'
+# for the k-NN classifier:
 comb <- c(allCombinations(list(k=1,l=0)),
           allCombinations(list(k=3,l=0:2)),
           allCombinations(list(k=5,l=0:4)),
@@ -34,14 +35,10 @@ print(comb)
 
 print(tunePareto(data = iris[, -ncol(iris)], 
                  labels = iris[, ncol(iris)],
-                 classifier = knn, 
-                 predictor = NULL, 
-                 classifierParameterCombinations = comb,
+                 classifier = tunePareto.knn(),
+                 parameterCombinations = comb,
                  objectiveFunctions = list(cvError(10, 10),
-                                           reclassError()),
-                 trainDataName = "train",
-                 testDataName = "test",
-                 trainLabelName = "cl"))
+                                           reclassError())))
 }
 
 \keyword{parameter combinations}

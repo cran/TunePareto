@@ -92,7 +92,7 @@ plotDominationGraph <- function(tuneParetoResult, transitiveReduction=TRUE,
   paretoFronts <- calculateParetoFronts(mat)
   
   # create igraph object
-  g <- graph.adjacency(edges, mode="directed")
+  g <- graph.adjacency(t(edges), mode="directed")
   
   dim_y <- 10
   
@@ -221,8 +221,11 @@ plotDominationGraph <- function(tuneParetoResult, transitiveReduction=TRUE,
 # <minimizeObjectives> is a Boolean vector specifying which objectives are minimized.
 # If <drawLabels> is TRUE, the parameter configurations are printed.
 # If <plotNew> is true, a new plot is started, otherwise lines are added to existing plots.
+# <xlim>, <ylim>, <xlab> and <ylab> correspond to the parameters in the generic plot routine.
+# <labelPos> specifies the position of the labels with respect to the points
 internal.plotParetoFronts2D <- function(objectiveVals, minimizeObjectives, boundaries,
-                                        drawLabels=TRUE, drawBoundaries=TRUE, plotNew=TRUE, ...)
+                                        drawLabels=TRUE, drawBoundaries=TRUE, plotNew=TRUE, 
+                                        xlim, ylim, xlab, ylab, labelPos=4, ...)
 {
   colorSet <- c("blue","green","red","darkgoldenrod","gold","brown","cyan",
       "purple","orange","seagreen","tomato","darkgray","chocolate",
@@ -235,19 +238,35 @@ internal.plotParetoFronts2D <- function(objectiveVals, minimizeObjectives, bound
   # calculate the Pareto fronts
   paretoFronts <- calculateParetoFronts(domination)
   
+  args <- list(...)
+  
+  if (missing(xlim))
+    xlim <- c(min(objectiveVals[,1]), max(objectiveVals[,1]))
+  
+  if (missing(ylim))
+    ylim <- c(min(objectiveVals[,2]), max(objectiveVals[,2]))
+    
+  if (missing(xlab))
+    xlab <- colnames(objectiveVals)[1]
+  
+  if (missing(ylab))
+    ylab <- colnames(objectiveVals)[2]  
+    
   if (plotNew)
   {
         plot(1, type="n", 
-           xlim=c(min(objectiveVals[,1]), max(objectiveVals[,1])),
-           ylim=c(min(objectiveVals[,2]), max(objectiveVals[,2])),
-           xlab=colnames(objectiveVals)[1],
-           ylab=colnames(objectiveVals)[2], ...)
+           xlim=xlim,
+           ylim=ylim,
+           xlab=xlab,
+           ylab=ylab, ...)
   }
   
   if (drawBoundaries && !is.null(boundaries))
   {
-    abline(v=boundaries[1], col="grey", lty=2)
-    abline(h=boundaries[2], col="grey", lty=2)
+    if (!is.na(boundaries[1]) && !is.null(boundaries[1]))
+      abline(v=boundaries[1], col="darkgrey", lty=2)
+    if (!is.na(boundaries[2]) && !is.null(boundaries[2]))
+      abline(h=boundaries[2], col="darkgrey", lty=2)
   }
   
   for (i in 1:length(paretoFronts))
@@ -261,7 +280,7 @@ internal.plotParetoFronts2D <- function(objectiveVals, minimizeObjectives, bound
  
     if (drawLabels)
       # add the configuration descriptions
-      text(pts[,1], pts[,2], rownames(pts), cex=0.5, pos=4)
+      text(pts[,1], pts[,2], rownames(pts), cex=0.5, pos=labelPos)
   }
  
 }
@@ -270,7 +289,8 @@ internal.plotParetoFronts2D <- function(objectiveVals, minimizeObjectives, bound
 # <tuneParetoResult> is an object of class TuneParetoResult.
 # <objectives> is a vector of indices or names of the objectives to plot.
 # If <drawLabels> is true, the descriptions of the configurations are written next to the plot
-plotParetoFronts2D <- function(tuneParetoResult, objectives, drawLabels=TRUE, drawBoundaries=TRUE, ...)
+# <labelPos> specifies the position of the labels with respect to the points
+plotParetoFronts2D <- function(tuneParetoResult, objectives, drawLabels=TRUE, drawBoundaries=TRUE, labelPos=4,...)
 {
   if(!inherits(tuneParetoResult, "TuneParetoResult"))
   {
@@ -301,13 +321,14 @@ plotParetoFronts2D <- function(tuneParetoResult, objectives, drawLabels=TRUE, dr
   boundaries <- tuneParetoResult$objectiveBoundaries[objectives]
   
   internal.plotParetoFronts2D(objectiveVals, minimizeObjectives, boundaries, 
-                              drawLabels=drawLabels, drawBoundaries=drawBoundaries, ...)
+                              drawLabels=drawLabels, drawBoundaries=drawBoundaries,
+                              labelPos=labelPos,...)
 }
 
 # Plots the Pareto fronts of pairs of objectives in <tuneParetoResult>
 # in a matrix-like plot. If <drawLabels> is true, the parameter configurations
 # are printed in the plot.
-plotObjectivePairs <- function(tuneParetoResult, drawLabels=TRUE, drawBoundaries=TRUE, ...)
+plotObjectivePairs <- function(tuneParetoResult, drawLabels=TRUE, drawBoundaries=TRUE, labelPos=4, ...)
 {
   xpos <- 0
   ypos <- 1
@@ -335,7 +356,8 @@ plotObjectivePairs <- function(tuneParetoResult, drawLabels=TRUE, drawBoundaries
                 internal.plotParetoFronts2D(data, 
                                             tuneParetoResult$minimizeObjectives[c(xpos,ypos)],
                                             tuneParetoResult$objectiveBoundaries[c(xpos,ypos)], 
-                                            drawLabels=drawLabels, drawBoundaries=drawBoundaries, 
+                                            drawLabels=drawLabels, drawBoundaries=drawBoundaries,
+                                            labelPos=labelPos,
                                             plotNew=FALSE, ...)
               })
 }

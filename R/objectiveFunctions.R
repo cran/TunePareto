@@ -89,16 +89,16 @@ groupByPrecalculation <- function(objectiveFunctionList)
 # For parameters, see callClassifier.
 #
 # Returns a list containing a vector of predicted labels and a vector of true labels
-reclassification <- function(data, labels, classifier, classifierParams,
-                             predictor, predictorParams,
-                             useFormula = FALSE, formulaName = "formula",
-                             trainDataName = "x", trainLabelName = "y", 
-                             testDataName = "newdata", modelName = "object")
+reclassification <- function(data, labels, classifier, classifierParams, predictorParams)
 {
-  predictedLabs <- callClassifier(data, labels, data, classifier, classifierParams,
-                                    predictor, predictorParams, useFormula, formulaName, 
-                                    trainDataName, trainLabelName, 
-                                    testDataName, modelName)
+  arglist <- list(classifier=classifier,trainData=data,trainLabels=labels)
+  arglist <- c(arglist, classifierParams)
+  train <- do.call(trainTuneParetoClassifier,arglist)
+  
+  arglist <- list(object=train, newdata=data)
+  arglist <- c(arglist, predictorParams)
+  
+  predictedLabs <- do.call(predict,arglist)
   
   #labels <- as.integer(as.character(labels))
 
@@ -112,16 +112,12 @@ reclassification <- function(data, labels, classifier, classifierParams,
 # <ntimes> is the number of repetitions of the cross-validation.
 # <nfold> is the number of groups in each cross-validation run.
 # If <leaveOneOut> is true, a leave-one-out cross-validation is performed.
-# For further parameters, see callClassifier.
 # If <stratified> is true, a stratified cross-validation is carried out.
+# For further parameters, see tuneParetoClassifier.
 #
 # Returns a list containing a sub-list for each run. Each of these sub-lists contains
 # a vector of true labels and predicted labels for each fold.
-crossValidation <- function(data, labels, classifier, classifierParams,
-                            predictor, predictorParams,
-                            useFormula = FALSE, formulaName = "formula",
-                            trainDataName = "x", trainLabelName = "y", 
-                            testDataName = "newdata", modelName = "object",
+crossValidation <- function(data, labels, classifier, classifierParams, predictorParams,
                             ntimes = 10, nfold = 10, leaveOneOut=FALSE, stratified = FALSE)
 {
   numSamples <- nrow(data)
@@ -175,11 +171,16 @@ crossValidation <- function(data, labels, classifier, classifierParams,
 	    testData <- data[fold,,drop=FALSE]
 	    testLabels <- labels[fold]
 	    
+	    arglist <- list(classifier=classifier,trainData=trainData,trainLabels=trainLabels)
+      arglist <- c(arglist, classifierParams)
+      train <- do.call(trainTuneParetoClassifier,arglist)
+  
+      arglist <- list(object=train, newdata=testData)
+      arglist <- c(arglist, predictorParams)
+  
 	    # predict test data
-	    res1 <- callClassifier(trainData, trainLabels, testData, 
-	                           classifier, classifierParams, predictor, predictorParams,
-                             useFormula, formulaName, trainDataName, trainLabelName, testDataName, modelName)
-    
+      res1 <- do.call(predict,arglist)
+	        
       # return the true labels and the predicted labels
       res1 <- list(predictedLabels=res1, trueLabels=testLabels)
       class(res1) <- "ClassificationResult"
@@ -222,6 +223,24 @@ reclassSpecificity <- function(caseClass)
                   direction="maximize",
                   name="Reclass.Specificity")
 }
+
+# Predefined objective calculating the confusion of two classes
+# in a reclassification experiment
+reclassConfusion <- function(trueClass, predictedClass)
+{
+  createObjective(precalculationFunction = reclassification,
+                  precalculationParams = NULL,
+                  objectiveFunction = function(result, trueClass, predictedClass)
+                                      {
+                                        return(sum(result$predictedLabels[result$trueLabels == trueClass]
+                                                    == predictedClass,na.rm=TRUE) / 
+                                               sum(result$trueLabels == trueClass))
+                                      },
+                  objectiveFunctionParams = list(trueClass=trueClass, predictedClass=predictedClass),
+                  direction="minimize",
+                  name="Reclass.Confusion")
+}
+
 
 # Predefined objective calculating the error percentage
 # of a reclassification experiment
@@ -281,6 +300,8 @@ cvError <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE)
                     name="CV.Error")
 }
 
+# Predefined objective calculating the variance of the error percentage
+# in a cross-validation experiment
 cvErrorVariance<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE)
 {
     createObjective(precalculationFunction = crossValidation,
@@ -306,7 +327,7 @@ cvErrorVariance<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = 
 cvWeightedError<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE)
 {
     createObjective(precalculationFunction = crossValidation,
-                    precalculationParams = list(nfold=nfold, ntimes=ntimes, leaveOneOut=leaveOneOut,stratified = stratified),
+                    precalculationParams = list(nfold=nfold, ntimes=ntimes, leaveOneOut=leaveOneOut, stratified = stratified),
                     objectiveFunction = function(result)
                                         {
                                           return(mean(sapply(result,
@@ -329,6 +350,34 @@ cvWeightedError<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = 
                                         },
                     direction="minimize",
                     name="CV.WeightedError")
+}
+
+# Predefined objective calculating the confusion of two classes
+# in a cross-validation experiment
+cvConfusion <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, 
+                        trueClass, predictedClass)
+{
+  createObjective(precalculationFunction = crossValidation,
+                  precalculationParams = list(nfold=nfold, ntimes=ntimes, leaveOneOut=leaveOneOut,stratified = stratified),
+                  objectiveFunction = function(result, trueClass, predictedClass)
+                                      {
+                                        return(mean(sapply(result,
+                                                 function(run)
+                                                      {
+                                                        predictedLabels <- unlist(lapply(run,
+                                                                                  function(fold)fold$predictedLabels))
+                                                        trueLabels <- unlist(lapply(run,
+                                                                             function(fold)fold$trueLabels))
+                                                        
+                                                        return(sum(predictedLabels[trueLabels == trueClass]
+                                                                   == predictedClass,na.rm=TRUE) / 
+                                                               sum(trueLabels == trueClass))
+                                                      })))
+ 
+                                      },
+                  objectiveFunctionParams = list(trueClass=trueClass, predictedClass=predictedClass),
+                  direction="minimize",
+                  name="CV.Confusion")
 }
 
 # Predefined objective calculating the sensitivity

@@ -1,17 +1,21 @@
 \name{print.TuneParetoResult}
 \alias{print.TuneParetoResult}
+\alias{print.TuneParetoClassifier}
+\alias{print.TuneParetoModel}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{
-Print function for the result of a parameter tuning
+Print method for objects used in TunePareto
 }
 \description{
-Prints the non-dominated parameter configurations determined in a call of \code{tunePareto}.
+Customized printing methods for several objects used in TunePareto: For \code{TuneParetoResult} objects, the Pareto-optimal parameter configurations are printed. For \code{TuneParetoClassifier} and \code{TuneParetoModel} objects, information on the classifier and its parameters is printed.
 }
 \usage{
 print.TuneParetoResult(x, ...)
+print.TuneParetoClassifier(x, ...)
+print.TuneParetoModel(x, ...)
 }
 \arguments{
-  \item{x}{An object of class \code{TuneParetoResult} to be printed.
+  \item{x}{An object of class \code{TuneParetoResult}, \code{TuneParetoClassifier} or \code{TuneParetoModel} to be printed.
 }
 
   \item{\dots}{Further parameters (currently unused).
@@ -22,16 +26,6 @@ Invisibly returns the printed object.
 }
 
 \seealso{
-\code{\link{tunePareto}}
-}
-\examples{
-# call tunePareto.knn with different k and l on the 'iris' data set
-x <- tunePareto.knn(data = iris[, -ncol(iris)], 
-                 labels = iris[, ncol(iris)],
-                 k = c(5,7,9),
-                 l = c(1,2,3),
-                 objectiveFunctions=list(cvError(10, 10),
-                                         cvSpecificity(10, 10, caseClass="setosa")))
-print(x)                 
+\code{\link{tunePareto}}, \code{\link{tuneParetoClassifier}}, \code{\link{trainTuneParetoClassifier}}
 }
 \keyword{print}
