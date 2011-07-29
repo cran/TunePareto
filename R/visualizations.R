@@ -5,26 +5,29 @@
 # Retrieves a list of Pareto fronts from 
 # a domination matrix <mat>.
 #
-# Returns a list of vectors.
+# Returns a list of vectors and a rank vector
 calculateParetoFronts <- function(mat)
 {
-  paretoFronts <-list()
+  ranks <- rep(NA,nrow(mat))
+  paretoFronts <- list()
   indexList <- 1:nrow(mat)
   
+  paretoFront <- 1
   # calculate the Pareto fronts
   while (length(indexList) != 0)
   {
     nonDominated <- which(!apply(mat,2,any))
     
-    paretoFronts[[length(paretoFronts) + 1]] <- indexList[nonDominated]
+    ranks[indexList[nonDominated]] <- paretoFront
+    paretoFronts[[paretoFront]] <- indexList[nonDominated]
    
     # remove the Pareto front from the list of points to consider 
     indexList <- indexList[-nonDominated]
     mat <- mat[-nonDominated, -nonDominated, drop=FALSE]
+    paretoFront <- paretoFront + 1
   }
-  return(paretoFronts)
+  return(list(paretoFronts=paretoFronts, ranks=ranks))
 }
-
 
 # Plots a graph in which each column of nodes represents one Pareto front
 # and edges represent a domination relation.
@@ -34,25 +37,41 @@ calculateParetoFronts <- function(mat)
 # which a configuration is the best in its Pareto front are drawn.
 # <drawLabels> specifies whether the configuration descriptions should be drawn.
 # <drawLegend> specifies whether a legend for the color bars should be plotted.
-# <legend.x> specifies the position of this legend.
+# <col.indicator> is a vector of colors for the objectives in the indicators
+# <pch.indicator> is a vector of symbols for the objectives in the indicators
+# <cex.indicator> is a value or vector specifying the sizes of the symbols in the indicators
+# <x.legend> specifies the position of this legend.
+# <cex.legend> specifies the character size of the legend
 #
 # Invisibly returns the igraph object.
-plotDominationGraph <- function(tuneParetoResult, transitiveReduction=TRUE, 
+plotDominationGraph <- function(tuneParetoResult, 
+                                transitiveReduction=TRUE, 
                                 drawDominatedObjectives=TRUE,
                                 drawLabels=TRUE,
                                 drawLegend=TRUE,
-                                legend.x="topleft", ...)
+                                x.legend="topleft", 
+                                cex.legend=0.7,
+                                col.indicator, 
+                                pch.indicator=15, 
+                                cex.indicator=0.8,
+                                 ...)
 {
   if(!inherits(tuneParetoResult, "TuneParetoResult"))
     stop("\"tuneParetoResult\" must be a TuneParetoResult object!")
   
   require(igraph)
   
-  colorSet <- c("blue","green","red","darkgoldenrod","gold","brown","cyan",
-      "purple","orange","seagreen","tomato","darkgray","chocolate",
-      "maroon","darkgreen","gray12","blue4","cadetblue","darkgoldenrod4",
-      "burlywood2")
-  
+  if (missing(col.indicator))
+      colorSet <- c("blue","green","red","darkgoldenrod","gold","brown","cyan",
+        "purple","orange","seagreen","tomato","darkgray","chocolate",
+        "maroon","darkgreen","gray12","blue4","cadetblue","darkgoldenrod4",
+        "burlywood2")
+  else
+  {
+    if (length(col.indicator) != length(tuneParetoResult$minimizeObjectives))
+      stop("Please specify one color for each objective function in col.indicator!")
+    colorSet <- col.indicator
+  }
   mat <- tuneParetoResult$dominationMatrix
   edges <- tuneParetoResult$dominationMatrix
   
@@ -89,7 +108,7 @@ plotDominationGraph <- function(tuneParetoResult, transitiveReduction=TRUE,
 
   }
   
-  paretoFronts <- calculateParetoFronts(mat)
+  paretoFronts <- calculateParetoFronts(mat)$paretoFronts
   
   # create igraph object
   g <- graph.adjacency(t(edges), mode="directed")
@@ -99,7 +118,7 @@ plotDominationGraph <- function(tuneParetoResult, transitiveReduction=TRUE,
   positions <- matrix(ncol=2, nrow=nrow(edges))
   
   # calculate graph layout
-  for (i in 1:length(paretoFronts))
+  for (i in seq_along(paretoFronts))
   {
 
     indices <- paretoFronts[[i]]
@@ -114,7 +133,7 @@ plotDominationGraph <- function(tuneParetoResult, transitiveReduction=TRUE,
       distance <- (dim_y - 1)/length(indices)
       offset <- 0.5
     }  
-    positions[indices, ] <- t(sapply(1:length(indices),function(j)
+    positions[indices, ] <- t(sapply(seq_along(indices),function(j)
                               {
                                 c(i + 1, offset + (j-1)*distance+distance/2)
                               }))
@@ -142,22 +161,35 @@ plotDominationGraph <- function(tuneParetoResult, transitiveReduction=TRUE,
   if (is.null(args$edge.curved))
     args$edge.curved <- !transitiveReduction
     
+  if(!is.null(args$legend.x))
+  {
+  # backward compatibility: 
+  # interpret old parameter legend.x which has been renamed to x.legend
+    x.legend <- args$legend.x
+    args <- args[names(args) != "legend.x"]
+  }
+    
   if (drawLabels)
     args$vertex.label <- rownames(edges)
   else
     args$vertex.label <- NA
   
-  plot(g, vertex.label=args$vertex.label, vertex.color=args$vertex.color,
-      vertex.label.cex = args$vertex.label.cex, vertex.label.dist=args$vertex.label.dist, 
-      vertex.size=args$vertex.size, edge.arrow.size=args$edge.arrow.size, 
-      layout=positions[1:nrow(edges),,drop=FALSE], ...)
-  
+  do.call(plot,c(list(x=g),args,list(layout=positions[1:nrow(edges),,drop=FALSE])))
+    
   # normalize layout
   positions <- layout.norm(positions,-1, 1, -1, 1)
 
-  cols <- c()  
+  cols <- c()
+  pchs <- c()
+  cexs <- c()
   if (drawDominatedObjectives)
   {
+  
+    cin <- par("cin")
+    Cex <- cex.indicator * par("cex") * 0.7
+
+    pchWidth <- Cex * xinch(cin[1L], warn.log = FALSE)
+  
     # calculate the dominated objectives for the color indicators
     dominatedObjectives <- lapply(paretoFronts,function(front)
     {
@@ -179,20 +211,25 @@ plotDominationGraph <- function(tuneParetoResult, transitiveReduction=TRUE,
     })
         
     # calculate the positions and colors of the color indicators      
-    for (i in 1:length(paretoFronts))
+    for (i in seq_along(paretoFronts))
     {
-      for (c in 1:ncol(dominatedObjectives[[i]]))
+      for (c in ncol(dominatedObjectives[[i]]):1)
       {
-        sumDom <- 1          
+        #sumDom <- 1          
+        sumDom <- xinch(cin[1L], warn.log=FALSE)
         for (r in 1:nrow(dominatedObjectives[[i]]))
         {       
           if (dominatedObjectives[[i]][r,c])
           {
+            r_inv <- nrow(dominatedObjectives[[i]]) - r
             positions <- rbind(positions,
-                               c(positions[paretoFronts[[i]][c],1] - sumDom*0.02 - 0.02, 
+                               c(positions[paretoFronts[[i]][c],1] - sumDom,#(sumDom+1)*pchWidth[(r - 1) %% length(pchWidth) + 1], 
                                  positions[paretoFronts[[i]][c],2]))
-            cols <- c(cols, colorSet[r])
-            sumDom <- sumDom + 1
+            cols <- c(cols, colorSet[(r_inv) %% length(colorSet) + 1])
+            pchs <- c(pchs, pch.indicator[(r_inv) %% length(pch.indicator) + 1])
+            cexs <- c(cexs, cex.indicator[(r_inv) %% length(cex.indicator) + 1])
+            #sumDom <- sumDom + 1
+            sumDom <- sumDom + pchWidth[(r_inv) %% length(pchWidth) + 1]
           }         
         }
       }
@@ -200,15 +237,15 @@ plotDominationGraph <- function(tuneParetoResult, transitiveReduction=TRUE,
     
     # draw the indicators     
     pts <- positions[-(1:nrow(edges)),,drop=FALSE]
-    points(pts[,1], pts[,2], pch=15, col=cols,
-           cex=0.8)
+    points(pts[,1], pts[,2], pch=pchs, col=cols,
+           cex=cexs)
            
     if (drawLegend)
       # draw the legend       
-      legend(x=legend.x, pch=15, ncol=1,
-             col=colorSet[1:ncol(tuneParetoResult$testedObjectiveValues)],
+      legend(x=x.legend, pch=pch.indicator, ncol=1, cex=cex.legend,
+             col=colorSet[(1:ncol(tuneParetoResult$testedObjectiveValues) - 1) %% length(colorSet) + 1],
              legend = paste("Dominates front in",colnames(tuneParetoResult$testedObjectiveValues)),
-             cex=0.75, box.lty=0)
+             pt.cex=cex.indicator[(1:ncol(tuneParetoResult$testedObjectiveValues) - 1) %% length(cex.indicator) + 1], box.lty=0)
   } 
      
   # return the graph
@@ -219,26 +256,33 @@ plotDominationGraph <- function(tuneParetoResult, transitiveReduction=TRUE,
 # to plot the Pareto fronts of two objectives.
 # <objectiveVals> is a matrix of objective values.
 # <minimizeObjectives> is a Boolean vector specifying which objectives are minimized.
+# <boundaries> is a vector of boundaries for the objectives, or NULL.
 # If <drawLabels> is TRUE, the parameter configurations are printed.
+# If <drawBoundaries is true, the boundaries of the objectives are plotted as lines.
 # If <plotNew> is true, a new plot is started, otherwise lines are added to existing plots.
-# <xlim>, <ylim>, <xlab> and <ylab> correspond to the parameters in the generic plot routine.
+# If <fitLabels> is TRUE, overlaps of the parameter configuration labels are removed.
+# <xlim>, <ylim>, <xlab>, <ylab>, <xaxs>, <yaxs>,
+# <type> and <lwd> correspond to the parameters in the generic plot routine.
 # <labelPos> specifies the position of the labels with respect to the points
+# <cex.conf> is the text size of the configuration labels.
+# <lty.fronts>, <pch.fronts> amd <col.fronts> specify the line types, the characters,
+# and the colors for the Pareto fronts.
 internal.plotParetoFronts2D <- function(objectiveVals, minimizeObjectives, boundaries,
-                                        drawLabels=TRUE, drawBoundaries=TRUE, plotNew=TRUE, 
-                                        xlim, ylim, xlab, ylab, labelPos=4, ...)
+                                        drawLabels=TRUE, drawBoundaries=TRUE, 
+                                        plotNew=TRUE, 
+                                        fitLabels=TRUE,
+                                        xlim, ylim, xlab, ylab, xaxs="r", yaxs="r",
+                                        labelPos=4, 
+                                        type="o", lwd=1, cex.conf=0.5,
+                                        lty.fronts=1, pch.fronts=8, col.fronts, ...)
 {
-  colorSet <- c("blue","green","red","darkgoldenrod","gold","brown","cyan",
-      "purple","orange","seagreen","tomato","darkgray","chocolate",
-      "maroon","darkgreen","gray12","blue4","cadetblue","darkgoldenrod4",
-      "burlywood2")
-
+  
   # calculate domination matrix of the 2 chosen objectives
   domination <- calculateDominationMatrix(objectiveVals, minimizeObjectives)
   
   # calculate the Pareto fronts
   paretoFronts <- calculateParetoFronts(domination)
   
-  args <- list(...)
   
   if (missing(xlim))
     xlim <- c(min(objectiveVals[,1]), max(objectiveVals[,1]))
@@ -250,7 +294,16 @@ internal.plotParetoFronts2D <- function(objectiveVals, minimizeObjectives, bound
     xlab <- colnames(objectiveVals)[1]
   
   if (missing(ylab))
-    ylab <- colnames(objectiveVals)[2]  
+    ylab <- colnames(objectiveVals)[2]
+    
+  if (missing(col.fronts) || is.null(col.fronts))
+    colorSet <- c("blue","green","red","darkgoldenrod","gold","brown","cyan",
+      "purple","orange","seagreen","tomato","darkgray","chocolate",
+      "maroon","darkgreen","gray12","blue4","cadetblue","darkgoldenrod4",
+      "burlywood2")
+  else
+    colorSet <- col.fronts
+  
     
   if (plotNew)
   {
@@ -258,7 +311,10 @@ internal.plotParetoFronts2D <- function(objectiveVals, minimizeObjectives, bound
            xlim=xlim,
            ylim=ylim,
            xlab=xlab,
-           ylab=ylab, ...)
+           ylab=ylab,
+           xaxs=xaxs,
+           yaxs=yaxs, 
+           lwd=lwd, ...)
   }
   
   if (drawBoundaries && !is.null(boundaries))
@@ -269,28 +325,147 @@ internal.plotParetoFronts2D <- function(objectiveVals, minimizeObjectives, bound
       abline(h=boundaries[2], col="darkgrey", lty=2)
   }
   
-  for (i in 1:length(paretoFronts))
+  pl <- c()
+  cl <- c()
+  for (i in seq_along(paretoFronts$paretoFronts))
   {
     # extract points and order them by their x value
-    pts <- objectiveVals[paretoFronts[[i]],,drop=FALSE]
+    pts <- objectiveVals[paretoFronts$paretoFronts[[i]],,drop=FALSE]
     pts <- pts[order(pts[,1]),,drop=FALSE]
     
+    pl <- rbind(pl,pts)
+    cl <- c(cl, rep(colorSet[(i - 1) %% length(colorSet) + 1],nrow(pts)))
+    
     # add new Pareto front
-    lines(pts[,1], pts[,2], col=colorSet[i %% length(colorSet)], pch=8, type="o")
+    lines(pts[,1], pts[,2], col=colorSet[(i - 1) %% length(colorSet) + 1], 
+          pch=pch.fronts[(i - 1) %% length(pch.fronts) + 1], 
+          type=type, lty=lty.fronts[(i - 1) %% length(lty.fronts) + 1], lwd=lwd)
  
-    if (drawLabels)
-      # add the configuration descriptions
-      text(pts[,1], pts[,2], rownames(pts), cex=0.5, pos=labelPos)
   }
- 
+  
+  if (drawLabels)
+  {
+    # add the configuration descriptions
+    if (!fitLabels)
+      # draw all labels
+      remaining <- 1:nrow(pl)
+    else
+      # remove overlapping labels
+      remaining <- removeOverlaps(labels=rownames(pl), 
+                                  positions=pl,
+                                  labelPos=labelPos, 
+                                  cex=cex.conf, 
+                                  xlim=xlim, 
+                                  ylim=ylim,
+                                  xaxs=xaxs,
+                                  yaxs=yaxs)
+  
+    text(pl[remaining,1], pl[remaining,2], rownames(pl)[remaining], 
+         cex=cex.conf, pos=labelPos, col=cl[remaining])
+  }
+}
+
+removeOverlaps <- function(labels, positions, labelPos=4, cex=0.5, offset=0.5, xlim, ylim, xaxs, yaxs)
+{
+  cxy <- par("cxy")
+  height <- strheight(labels,cex=cex)
+  width <- strwidth(labels,cex=cex)
+  
+  if (xaxs == "r")
+  # extend x range by 4%
+  {
+    xlimRangeExt <- (xlim[2] - xlim[1]) * 0.02
+    xlim[1] <- xlim[1] - xlimRangeExt
+    xlim[2] <- xlim[2] + xlimRangeExt
+  }
+  
+  if (yaxs == "r")
+  # extend y range by 4%
+  {
+    ylimRangeExt <- (ylim[2] - ylim[1]) * 0.02
+    ylim[1] <- ylim[1] - ylimRangeExt
+    ylim[2] <- ylim[2] + ylimRangeExt
+  }
+  
+  # calculate positions of labels
+  rects <- switch(labelPos,
+    "1" = {
+            cbind(positions[,1] - width/2,
+                  positions[,2] - height - cxy[2]*offset,
+                  positions[,1] + width/2,
+                  positions[,2] - cxy[2]*offset)
+          },
+    "2" = {
+            cbind(positions[,1] - width - cxy[1]*offset,
+                  positions[,2] - height/2,
+                  positions[,1] - cxy[1]*offset,
+                  positions[,2] + height/2)          
+          },      
+    "3" = {
+            cbind(positions[,1] - width/2,
+                  positions[,2] + cxy[2]*offset,
+                  positions[,1] + width/2,
+                  positions[,2] + height + cxy[2]*offset)
+        },
+    "4" = {
+          cbind(positions[,1] + cxy[1]*offset,
+                positions[,2] - height/2,
+                positions[,1] + width + cxy[1]*offset,
+                positions[,2] + height/2)   
+          })
+  
+  # determine which labels do not exceed the plotting region
+  remaining <- which(apply(rects,1,function(pos)
+                    {
+                      pos[1] >= xlim[1] && pos[2] >= ylim[1] &&
+                      pos[3] <= xlim[2] && pos[4] <= ylim[2]
+                    }))
+  
+  # determine which labels overlap
+  overlap <- matrix(apply(rects[remaining,,drop=FALSE],1,function(pos1)
+                     apply(rects[remaining,,drop=FALSE],1,function(pos2)
+                     {
+                        pos1[1] <= pos2[3] && pos1[3] >= pos2[1] &&
+                        pos1[2] <= pos2[4] && pos1[4] >= pos2[4]
+                     })), ncol=length(remaining))
+               
+  diag(overlap) <- FALSE
+  
+  # calculate the number of overlaps for each label
+  sums <- apply(overlap,2,sum)
+  
+  # apply a greedy strategy by iteratively
+  # removing the labels with the most overlaps
+  while(any(sums > 0))
+  {
+    # choose between equal overlap count randomly
+    removeIdx <- sample(which(sums==max(sums)),size=1)
+    
+    # reduce overlap matrix and recalculate sum
+    overlap <- overlap[-removeIdx,-removeIdx,drop=FALSE]
+    sums <- apply(overlap,2,sum)
+    
+    # remove the label
+    remaining <- remaining[-removeIdx]
+  }
+  
+  return(remaining)               
 }
 
 # Plots a 2D plot of two objectives in an optimization.
 # <tuneParetoResult> is an object of class TuneParetoResult.
 # <objectives> is a vector of indices or names of the objectives to plot.
 # If <drawLabels> is true, the descriptions of the configurations are written next to the plot
+# If <drawBoundaries is true, the boundaries of the objectives are plotted as lines.
 # <labelPos> specifies the position of the labels with respect to the points
-plotParetoFronts2D <- function(tuneParetoResult, objectives, drawLabels=TRUE, drawBoundaries=TRUE, labelPos=4,...)
+# If <fitLabels> is TRUE, overlaps of the parameter configuration labels are removed.
+# <cex.conf> is the text size of the configuration labels.
+# <labelPos> is the position of the text relative to the points.
+# <lty.fronts>, <pch.fronts> amd <col.fronts> specify the line types, the characters,
+# and the colors for the Pareto fronts.
+plotParetoFronts2D <- function(tuneParetoResult, objectives, drawLabels=TRUE,
+                               drawBoundaries=TRUE, labelPos=4, fitLabels=TRUE,
+                               cex.conf=0.5, lty.fronts=1, pch.fronts=8, col.fronts, ...)
 {
   if(!inherits(tuneParetoResult, "TuneParetoResult"))
   {
@@ -305,7 +480,9 @@ plotParetoFronts2D <- function(tuneParetoResult, objectives, drawLabels=TRUE, dr
       stop("Please supply exactly 2 objectives!")
   }
   
-  
+  if (missing(col.fronts))
+    col.fronts <- NULL
+    
   if (length(objectives) != 2)
   {
     stop("Please supply exactly 2 objectives!")
@@ -321,15 +498,34 @@ plotParetoFronts2D <- function(tuneParetoResult, objectives, drawLabels=TRUE, dr
   boundaries <- tuneParetoResult$objectiveBoundaries[objectives]
   
   internal.plotParetoFronts2D(objectiveVals, minimizeObjectives, boundaries, 
-                              drawLabels=drawLabels, drawBoundaries=drawBoundaries,
-                              labelPos=labelPos,...)
+                              drawLabels=drawLabels, ,
+                              drawBoundaries=drawBoundaries,
+                              labelPos=labelPos,
+                              fitLabels=fitLabels,                              
+                              cex.conf=cex.conf,
+                              lty.fronts=lty.fronts, 
+                              pch.fronts=pch.fronts,
+                              col.fronts=col.fronts,
+                              ...)
 }
 
 # Plots the Pareto fronts of pairs of objectives in <tuneParetoResult>
 # in a matrix-like plot. If <drawLabels> is true, the parameter configurations
 # are printed in the plot.
-plotObjectivePairs <- function(tuneParetoResult, drawLabels=TRUE, drawBoundaries=TRUE, labelPos=4, ...)
+# If <drawBoundaries is true, the boundaries of the objectives are plotted as lines.
+# <cex.conf> is the text size of the configuration labels.
+# <labelPos> is the position of the text relative to the points.
+# If <fitLabels> is TRUE, overlaps of the parameter configuration labels are removed.
+# <lty.fronts>, <pch.fronts> amd <col.fronts> specify the line types, the characters,
+# and the colors for the Pareto fronts.
+plotObjectivePairs <- function(tuneParetoResult, drawLabels=TRUE,
+                               drawBoundaries=TRUE, labelPos=4, fitLabels=TRUE,
+                               cex.conf=0.5, lty.fronts=1, pch.fronts=8, col.fronts,...)
 {
+
+  if (missing(col.fronts))
+    col.fronts <- NULL
+
   xpos <- 0
   ypos <- 1
   
@@ -356,8 +552,14 @@ plotObjectivePairs <- function(tuneParetoResult, drawLabels=TRUE, drawBoundaries
                 internal.plotParetoFronts2D(data, 
                                             tuneParetoResult$minimizeObjectives[c(xpos,ypos)],
                                             tuneParetoResult$objectiveBoundaries[c(xpos,ypos)], 
-                                            drawLabels=drawLabels, drawBoundaries=drawBoundaries,
-                                            labelPos=labelPos,
+                                            drawLabels=drawLabels, 
+                                            drawBoundaries=drawBoundaries,
+                                            labelPos=labelPos,         
+                                            fitLabels=fitLabels,
+                                            cex.conf=cex.conf,
+                                            lty.fronts=lty.fronts, 
+                                            pch.fronts=pch.fronts,
+                                            col.fronts=col.fronts,
                                             plotNew=FALSE, ...)
               })
 }

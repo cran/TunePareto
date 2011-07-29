@@ -14,13 +14,13 @@
 # the test data, and the classification model respectively.
 # <requiredPackages> is a character vector of packages to load for the classifier.
 tuneParetoClassifier <- function(name, classifier, classifierParamNames=NULL, predefinedClassifierParams=NULL,
-                                 predictor, predictorParamNames=NULL, predefinedPredictorParams=NULL,
+                                 predictor=NULL, predictorParamNames=NULL, predefinedPredictorParams=NULL,
                                  useFormula = FALSE, formulaName = "formula",
-                                 trainDataName = "x", trainLabelName = "y", testDataName = "newData",
-                                 modelName = "object", requiredPackages)
+                                 trainDataName = "x", trainLabelName = "y", testDataName = "newdata",
+                                 modelName = "object", requiredPackages=NULL)
 {
   # load packages
-  if (!missing(requiredPackages))
+  if (length(requiredPackages) > 0)
     lapply(requiredPackages,function(package)require(package, character.only=TRUE))
     
   res <- list(name = name,

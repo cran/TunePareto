@@ -12,16 +12,16 @@ tuneParetoClassifier(name,
                      classifier, 
                      classifierParamNames = NULL, 
                      predefinedClassifierParams = NULL, 
-                     predictor, 
+                     predictor = NULL, 
                      predictorParamNames = NULL, 
                      predefinedPredictorParams = NULL, 
                      useFormula = FALSE, 
                      formulaName = "formula", 
                      trainDataName = "x", 
                      trainLabelName = "y", 
-                     testDataName = "newData", 
+                     testDataName = "newdata", 
                      modelName = "object", 
-                     requiredPackages)
+                     requiredPackages = NULL)
 }
 \arguments{
 

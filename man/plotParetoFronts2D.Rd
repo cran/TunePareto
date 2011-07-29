@@ -11,7 +11,12 @@ plotParetoFronts2D(tuneParetoResult,
                    objectives, 
                    drawLabels = TRUE, 
                    drawBoundaries = TRUE, 
-                   labelPos = 4, 
+                   labelPos = 4,
+                   fitLabels=TRUE,
+                   cex.conf=0.5, 
+                   lty.fronts=1, 
+                   pch.fronts=8, 
+                   col.fronts,
                    ...)
 }
 \arguments{
@@ -30,7 +35,27 @@ If set to true, the upper or lower objective limits supplied in the \code{object
 }
 
   \item{labelPos}{
-The position of the configuration labels in the plot. Values of 1, 2, 3 and 4 denote positions below, to the left of, above and to the right of the points on the Pareto fronts.
+The position of the configuration labels in the plot (if \code{drawLabels} is true). Values of 1, 2, 3 and 4 denote positions below, to the left of, above and to the right of the points on the Pareto fronts.
+}
+
+  \item{fitLabels}{
+If this parameter is true (and \code{drawLabels} is true), overlapping or partially hidden configuration labels are removed from the plot to improve the readability of the remaining labels.
+}
+
+  \item{cex.conf}{
+The size of the configuration labels in the plots (if \code{drawLabels} is true).  
+}
+
+  \item{lty.fronts}{
+A vector of line types to use for the Pareto fronts. By default, straight lines are drawn for all fronts.  
+}
+
+  \item{pch.fronts}{
+A vector of symbols to use for points on the Pareto fronts. All points on the same front will have the same symbol. By default, an asterisk is used.
+}
+
+  \item{col.fronts}{
+A vector of colors to use for the Pareto fronts. By default, a predefined set of colors is used.  
 }
 
   \item{...}{

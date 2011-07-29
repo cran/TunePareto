@@ -71,8 +71,11 @@ If this parameter is set, it specifies boundaries of the objective functions for
 }
 
   \item{keepSeed}{
-If this is true, the random seed is reset to the same value for each of the tested parameter configurations. This is an easy way to guarantee comparability in randomized objective functions, e.g. in cross-validation runs of the classifiers.
+If this is true, the random seed is reset to the same value for each of the tested parameter configurations. This is an easy way to guarantee comparability in randomized objective functions. E.g., cross-validation runs of the classifiers will all start with the same seed, which results in the same partitions. 
+
+\bold{Attention: } If you set this parameter to \code{FALSE}, you must ensure that all configuration are treated equally in the objective functions: There may be randomness in processes such as classifier training, but there should be no random difference in the rating itself. In particular, the choice of subsets for subsampling experiments should always be the same for all configurations. For example, you can provide precalculated fold lists to the cross-validation objectives in the \code{foldList} parameter. If parameter configurations are rated under varying conditions, this may yield over-optimistic or over-pessimistic ratings for some configurations due to outliers.
 }
+
   \item{useSnowfall}{
 If this parameter is true, the routine loads the \pkg{snowfall} package and processes the parameter configurations in parallel. Please note that the \pkg{snowfall} cluster has to be initialized properly before running the tuning function and stopped after the run.
 }

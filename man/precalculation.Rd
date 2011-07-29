@@ -15,7 +15,8 @@ reclassification(data, labels,
 crossValidation(data, labels, 
                 classifier, classifierParams, predictorParams, 
                 ntimes = 10, nfold = 10, 
-                leaveOneOut = FALSE, stratified = FALSE)
+                leaveOneOut = FALSE, stratified = FALSE,
+                foldList = NULL)
 }
 \arguments{
 \item{data}{
@@ -49,6 +50,10 @@ If this is true, a leave-one-out cross-validation is performed, i.e. each sample
 If set to true, a stratified cross-validation is carried out. That is, the percentage of samples from different classes in the cross-validation folds corresponds to the class sizes in the complete data set. If set to false, the folds may be unbalanced.
 }
 
+  \item{foldList}{
+If this parameter is set, the other cross-validation parameters (\code{ntimes}, \code{nfold}, \code{leaveOneOut}, \code{stratified}) are ignored. Instead, the precalculated cross-validation partition supplied in \code{foldList} is used. This allows for using the same cross-validation experiment in multiple \code{\link{tunePareto}} calls. Partitions can be generated using \code{\link{generateCVRuns}}. 
+}
+
 }
 \details{
 \code{reclassification} trains the classifier with the full data set. Afterwards, the classifier is applied to the same data set. 
@@ -72,20 +77,21 @@ That is, for a cross-validation with \code{n} runs and \code{m} folds, there are
 
 
 \seealso{
-\code{\link{createObjective}}
+\code{\link{createObjective}}, \code{\link{generateCVRuns}}. 
 }
 \examples{
 
 # create new objective minimizing the
 # false positives of a reclassification
 
-cvFalsePositives <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, caseClass)
+cvFalsePositives <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, foldList=NULL, caseClass)
 {
   return(createObjective(
             precalculationFunction = "crossValidation",
             precalculationParams = list(nfold=nfold, 
                                         ntimes=ntimes, 
-                                        leaveOneOut=leaveOneOut),
+                                        leaveOneOut=leaveOneOut,
+                                        foldList=foldList),
             objectiveFunction = 
             function(result, caseClass)
             {

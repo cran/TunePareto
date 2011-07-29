@@ -34,5 +34,6 @@ crossValidation,
 print.TuneParetoResult,
 print.TuneParetoModel,
 print.TuneParetoClassifier,
-rankByDesirability
+rankByDesirability,
+generateCVRuns
 )

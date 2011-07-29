@@ -1,6 +1,5 @@
 \name{plotDominationGraph}
 \alias{plotDominationGraph}
-%- Also NEED an '\alias' for EACH other topic documented here.
 \title{
 Visualize the Pareto fronts of parameter configuration scores
 }
@@ -13,7 +12,11 @@ plotDominationGraph(tuneParetoResult,
                     drawDominatedObjectives = TRUE, 
                     drawLabels = TRUE, 
                     drawLegend = TRUE,
-                    legend.x = "topleft", 
+                    x.legend = "topleft",
+                    cex.legend = 0.7,
+                    col.indicator, 
+                    pch.indicator = 15, 
+                    cex.indicator = 0.8,
                     ...)
 }
 
@@ -34,10 +37,26 @@ Specifies whether the parameter configurations should be printed next to the cor
 If \code{drawDominatedObjectives=TRUE}, this specifies whether a legend with the objective colors should be drawn.
 }
 
-  \item{legend.x}{
+  \item{x.legend}{
 The position of the legend. For details, refer to the \code{x} parameter of \code{\link{legend}}.
 }
 
+  \item{cex.legend}{
+Specifies the size of the text in the legend if \code{drawLegend} is true.  
+}
+
+  \item{col.indicator}{
+Specifies an optional list of colors, one for each objective function. These colors will be used for the indicators if \code{drawDominatedObjectives} is true. By default, a predefined set of colors is used. 
+}
+
+  \item{pch.indicator}{
+Specifies a single plotting character or a list of plotting characters for the objective functions in the indicators which is used for the indicators if \code{drawDominatedObjectives} is true.  
+}
+
+  \item{cex.indicator}{
+Specifies the size of the symbols in the indicators which is be used for the indicators if \code{drawDominatedObjectives} is true. This can also be a vector of sizes for the symbols of the objectives. 
+}
+  
   \item{\dots}{
 Further graphical parameters for \code{\link[igraph:plot.graph]{plot.igraph}}.
 }

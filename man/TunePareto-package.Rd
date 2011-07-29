@@ -12,8 +12,8 @@ Generic methods for parameter tuning of classification algorithms using multiple
 \tabular{ll}{
 Package: \tab TunePareto\cr
 Type: \tab Package\cr
-Version: \tab 2.0\cr
-Date: \tab 2011-04-15\cr
+Version: \tab 2.1\cr
+Date: \tab 2011-07-29\cr
 License: \tab Artistic-2.0 \cr
 LazyLoad: \tab yes\cr
 }

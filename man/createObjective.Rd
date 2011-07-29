@@ -89,13 +89,14 @@ Retuns an object of class \code{TuneParetoObjective} with the following componen
 # create new objective minimizing the
 # false positives of a reclassification
 
-cvFalsePositives <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, caseClass)
+cvFalsePositives <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, foldList=NULL, caseClass)
 {
   return(createObjective(
             precalculationFunction = "crossValidation",
             precalculationParams = list(nfold=nfold, 
                                         ntimes=ntimes, 
-                                        leaveOneOut=leaveOneOut),
+                                        leaveOneOut=leaveOneOut,
+                                        foldList=foldList),
             objectiveFunction = 
             function(result, caseClass)
             {

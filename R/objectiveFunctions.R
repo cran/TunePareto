@@ -77,7 +77,7 @@ groupByPrecalculation <- function(objectiveFunctionList)
   
   # calculate permutation of original indices for subsequent reordering
   permutation <- indices
-  for (i in 1:length(permutation))
+  for (i in seq_along(permutation))
     permutation[indices[i]] <- i
     
   return(list(grouping=resultList, permutation=permutation))
@@ -108,20 +108,13 @@ reclassification <- function(data, labels, classifier, classifierParams, predict
   return(res)
 }
 
-# Predefined precalculation function that performs a cross-validation on <data>.
-# <ntimes> is the number of repetitions of the cross-validation.
-# <nfold> is the number of groups in each cross-validation run.
-# If <leaveOneOut> is true, a leave-one-out cross-validation is performed.
-# If <stratified> is true, a stratified cross-validation is carried out.
-# For further parameters, see tuneParetoClassifier.
-#
-# Returns a list containing a sub-list for each run. Each of these sub-lists contains
-# a vector of true labels and predicted labels for each fold.
-crossValidation <- function(data, labels, classifier, classifierParams, predictorParams,
-                            ntimes = 10, nfold = 10, leaveOneOut=FALSE, stratified = FALSE)
+# Generate a list of partitions for a cross-validation that can
+# be used for all cross-validation methods. 
+# For parameters, see crossValidation
+generateCVRuns <- function(labels, ntimes = 10, nfold = 10, 
+                           leaveOneOut=FALSE, stratified = FALSE)
 {
-  numSamples <- nrow(data)
-  
+  numSamples <- length(labels)
   res <- lapply(1:ntimes,function(run)
   # for each run
   {
@@ -132,35 +125,63 @@ crossValidation <- function(data, labels, classifier, classifierParams, predicto
 	  }
 	  else
 	  {
-		if(stratified)
-		{
-			classes <- unique(labels)
-			sing.perm <- lapply(classes, function(cl){
-				index <- which(labels == cl)
-				sample(index, length(index))
-			})
-			permut <- unlist(sing.perm)
-			indices <- lapply(1:nfold,function(i){c()})
-			for(i in 1:numSamples)
-			{
-				k = i%%nfold
-				if(k==0)
-				 k = nfold
-				
-				indices[[k]] <- c(indices[[k]], permut[i])
-			}
-		}
-		else
-		{
-		  # permute the indices of the samples
-		  permut <- sample(1:numSamples, numSamples,replace=FALSE)
-		  indices <- lapply(1:nfold, function(i)
+		  if(stratified)
 		  {
-			  # split the samples in nfold groups
-			  permut[seq(i, numSamples, nfold)]
-		  })
-		}
+			  classes <- unique(labels)
+			  sing.perm <- lapply(classes, function(cl){
+				  index <- which(labels == cl)
+				  sample(index, length(index))
+			  })
+			  permut <- unlist(sing.perm)
+			  indices <- lapply(1:nfold,function(i){c()})
+			  for(i in 1:numSamples)
+			  {
+				  k = i%%nfold
+				  if(k==0)
+				   k = nfold
+				
+				  indices[[k]] <- c(indices[[k]], permut[i])
+			  }
+		  }
+		  else
+		  {
+		    # permute the indices of the samples
+		    permut <- sample(1:numSamples, numSamples,replace=FALSE)
+		    indices <- lapply(1:nfold, function(i)
+		    {
+			    # split the samples in nfold groups
+			    permut[seq(i, numSamples, nfold)]
+		    })
+		  }
 	  }
+	  return(indices)
+	})
+	return(res)
+}
+
+# Predefined precalculation function that performs a cross-validation on <data>.
+# <ntimes> is the number of repetitions of the cross-validation.
+# <nfold> is the number of groups in each cross-validation run.
+# If <leaveOneOut> is true, a leave-one-out cross-validation is performed.
+# If <stratified> is true, a stratified cross-validation is carried out.
+# For further parameters, see tuneParetoClassifier.
+#
+# Returns a list containing a sub-list for each run. Each of these sub-lists contains
+# a vector of true labels and predicted labels for each fold.
+crossValidation <- function(data, labels, classifier, classifierParams, predictorParams,
+                            ntimes = 10, nfold = 10, leaveOneOut=FALSE, stratified = FALSE,
+                            foldList = NULL)
+{
+    
+  if (is.null(foldList))
+    foldList <- generateCVRuns(labels=labels, 
+                            ntimes=ntimes, nfold=nfold,
+                            leaveOneOut=leaveOneOut,
+                            stratified=stratified)
+  
+  res <- lapply(foldList,function(indices)
+  # for each run
+  {    
 	  
 	  return(lapply(indices, function(fold)
 	  # for each fold
@@ -280,10 +301,14 @@ reclassWeightedError <- function()
 
 # Predefined objective calculating the error percentage
 # of a cross-validation experiment
-cvError <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE)
+cvError <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL)
 {
     createObjective(precalculationFunction = crossValidation,
-                    precalculationParams = list(nfold=nfold, ntimes=ntimes, leaveOneOut=leaveOneOut,stratified = stratified),
+                    precalculationParams = list(nfold = nfold, 
+                                                ntimes = ntimes, 
+                                                leaveOneOut = leaveOneOut,
+                                                stratified = stratified,
+                                                foldList = foldList),
                     objectiveFunction = function(result)
                                         {
                                           numSamples <- sum(sapply(result[[1]], function(fold)length(fold$trueLabels)))
@@ -302,10 +327,14 @@ cvError <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE)
 
 # Predefined objective calculating the variance of the error percentage
 # in a cross-validation experiment
-cvErrorVariance<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE)
+cvErrorVariance<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL)
 {
     createObjective(precalculationFunction = crossValidation,
-                    precalculationParams = list(nfold=nfold, ntimes=ntimes, leaveOneOut=leaveOneOut,stratified = stratified),
+                    precalculationParams = list(nfold = nfold, 
+                                                ntimes = ntimes, 
+                                                leaveOneOut = leaveOneOut,
+                                                stratified = stratified,
+                                                foldList = foldList),
                     objectiveFunction = function(result)
                                         {
                                           numSamples <- sum(sapply(result[[1]], function(fold)length(fold$trueLabels)))
@@ -316,7 +345,7 @@ cvErrorVariance<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = 
                                                           is.na(fold$predictedLabels) | 
                                                           fold$predictedLabels != fold$trueLabels
                                                         })))
-                                                      }))/numSamples)
+                                                      }))/(numSamples^2))
                                         },
                     direction="minimize",
                     name="CV.Error.Var")
@@ -324,10 +353,14 @@ cvErrorVariance<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = 
 
 # Predefined objective calculating the error percentage
 # of a cross-validation experiment
-cvWeightedError<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE)
+cvWeightedError<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL)
 {
     createObjective(precalculationFunction = crossValidation,
-                    precalculationParams = list(nfold=nfold, ntimes=ntimes, leaveOneOut=leaveOneOut, stratified = stratified),
+                    precalculationParams = list(nfold = nfold, 
+                                                ntimes = ntimes, 
+                                                leaveOneOut = leaveOneOut,
+                                                stratified = stratified,
+                                                foldList = foldList),
                     objectiveFunction = function(result)
                                         {
                                           return(mean(sapply(result,
@@ -354,11 +387,15 @@ cvWeightedError<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = 
 
 # Predefined objective calculating the confusion of two classes
 # in a cross-validation experiment
-cvConfusion <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, 
+cvConfusion <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL,
                         trueClass, predictedClass)
 {
   createObjective(precalculationFunction = crossValidation,
-                  precalculationParams = list(nfold=nfold, ntimes=ntimes, leaveOneOut=leaveOneOut,stratified = stratified),
+                  precalculationParams = list(nfold = nfold, 
+                                              ntimes = ntimes, 
+                                              leaveOneOut = leaveOneOut,
+                                              stratified = stratified,
+                                              foldList = foldList),
                   objectiveFunction = function(result, trueClass, predictedClass)
                                       {
                                         return(mean(sapply(result,
@@ -382,10 +419,14 @@ cvConfusion <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FAL
 
 # Predefined objective calculating the sensitivity
 # of a cross-validation experiment
-cvSensitivity<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, caseClass)
+cvSensitivity<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL, caseClass)
 {
     createObjective(precalculationFunction = crossValidation,
-                    precalculationParams = list(nfold=nfold, ntimes=ntimes, leaveOneOut=leaveOneOut,stratified = stratified),
+                    precalculationParams = list(nfold = nfold, 
+                                                ntimes = ntimes, 
+                                                leaveOneOut = leaveOneOut,
+                                                stratified = stratified,
+                                                foldList = foldList),
                     objectiveFunction = function(result, caseClass)
                                         {
                                           return(mean(sapply(result,
@@ -408,10 +449,14 @@ cvSensitivity<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FA
 
 # Predefined objective calculating the specificity
 # of a cross-validation experiment
-cvSpecificity<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE,caseClass)
+cvSpecificity<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL, caseClass)
 {
     createObjective(precalculationFunction = crossValidation,
-                    precalculationParams = list(nfold=nfold, ntimes=ntimes, leaveOneOut=leaveOneOut,stratified = stratified),
+                    precalculationParams = list(nfold = nfold, 
+                                                ntimes = ntimes, 
+                                                leaveOneOut = leaveOneOut,
+                                                stratified = stratified,
+                                                foldList = foldList),
                     objectiveFunction = function(result, caseClass)
                                         {
                                           return(mean(sapply(result,

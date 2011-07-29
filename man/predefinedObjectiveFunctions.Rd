@@ -24,18 +24,23 @@ reclassSensitivity(caseClass)
 reclassSpecificity(caseClass)
 reclassConfusion(trueClass, predictedClass)
 cvError(nfold = 10, ntimes = 10, 
-        leaveOneOut = FALSE, stratified=FALSE)
+        leaveOneOut = FALSE, stratified=FALSE, 
+        foldList=NULL)
 cvErrorVariance(nfold = 10, ntimes = 10, 
-                leaveOneOut = FALSE, stratified=FALSE)
+                leaveOneOut = FALSE, stratified=FALSE, 
+                foldList=NULL)
 cvWeightedError(nfold = 10, ntimes = 10, 
-                leaveOneOut = FALSE, stratified=FALSE)
+                leaveOneOut = FALSE, stratified=FALSE, 
+                foldList=NULL)
 cvSensitivity(nfold = 10, ntimes = 10, 
-              leaveOneOut = FALSE, stratified=FALSE, caseClass)
+              leaveOneOut = FALSE, stratified=FALSE, 
+              foldList=NULL, caseClass)
 cvSpecificity(nfold = 10, ntimes = 10, 
-              leaveOneOut = FALSE, stratified=FALSE, caseClass)
+              leaveOneOut = FALSE, stratified=FALSE, 
+              foldList=NULL, caseClass)
 cvConfusion(nfold = 10, ntimes = 10, 
             leaveOneOut = FALSE, stratified=FALSE,
-            trueClass, predictedClass)
+            foldList=NULL, trueClass, predictedClass)
 }
 \arguments{
   \item{nfold}{
@@ -50,6 +55,10 @@ If this is true, a leave-one-out cross-validation is performed, i.e. each sample
 
   \item{stratified}{
 If set to true, a stratified cross-validation is carried out. That is, the percentage of samples from different classes in the cross-validation folds corresponds to the class sizes in the complete data set. If set to false, the folds may be unbalanced.
+}
+
+  \item{foldList}{
+If this parameter is set, the other cross-validation parameters (\code{ntimes}, \code{nfold}, \code{leaveOneOut}, \code{stratified}) are ignored. Instead, the precalculated cross-validation partition supplied in \code{foldList} is used. This allows for using the same cross-validation experiment in multiple \code{\link{tunePareto}} calls. Partitions can be generated using \code{\link{generateCVRuns}}.
 }
 
   \item{caseClass}{The class containing the positive samples for the calculation of specificity and sensitivity. All samples with different class labels are regarded as controls (negative samples).}
@@ -76,7 +85,7 @@ An object of class \code{TuneParetoObjective} representing the objective functio
 }
 
 \seealso{
-\code{\link{createObjective}}, \code{\link{tunePareto}}
+\code{\link{createObjective}}, \code{\link{tunePareto}}, \code{\link{generateCVRuns}}
 }
 \examples{
 

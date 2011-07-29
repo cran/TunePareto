@@ -49,12 +49,18 @@ tunePareto <- function(..., data, labels,
       (missing(numCombinations) || is.null(numCombinations)))
     stop("For sampleType=\"uniform\",\"latin\",\"halton\",\"niederreiter\" or \"sobol\", you must specify numCombinations!")
 
-  if(!inherits(classifier, "TuneParetoClassifier"))
+  if (missing(data) || missing(labels) || missing(classifier) || missing(objectiveFunctions))
+    stop("Please supply at least \"data\", \"labels\", \"classifier\" and \"objectiveFunctions\"!")
+
+  if (!inherits(classifier, "TuneParetoClassifier"))
     stop("\"classifier\" must be a TuneParetoClassifier object!")
   
   if (length(labels) != nrow(data))
     stop("Dimensions of data matrix and class label vector are incompatible!")
   
+  if (length(classifier$requiredPackages) > 0)
+      lapply(classifier$requiredPackages,function(package)require(package, character.only=TRUE))
+      
   if (useSnowfall)
   {
      require(snowfall)
@@ -130,7 +136,12 @@ tunePareto <- function(..., data, labels,
   minimizeObjectives <- sapply(objectiveFunctions,function(x)x$minimize)
 
   if (verbose)
-    cat("Testing parameter combinations...\n")
+  {
+    if (sampleType == "evolution")
+      cat("Testing",lambda * numIterations + mu,"parameter combinations...\n")
+    else
+      cat("Testing",length(combinations),"parameter combinations...\n")
+  }
   
   # store random seed
   runif(n=1)  
@@ -217,7 +228,7 @@ tunePareto <- function(..., data, labels,
                             {
                               if (is.interval(range))
                               {
-                                (range$upper - range$lower)/100
+                                (range$upper - range$lower)* runif(n=1,min=1/100,max=1/10)
                               }
                               else
                                 NA
@@ -225,7 +236,7 @@ tunePareto <- function(..., data, labels,
                             
     individuals <- lapply(latinHypercube(args,N=mu), function(ind)
                             list(individual=ind,mutation=mutationRates))
-    
+  
     # calculate initial fitness
     if (useSnowfall)
     { 
@@ -242,45 +253,36 @@ tunePareto <- function(..., data, labels,
       oldObjectiveValues <- t(sapply(individuals, function(cand)calculateObjectiveVals(cand$individual)))
     }
     
+    dominationMatrix <- calculateDominationMatrix(oldObjectiveValues[, groups$permutation], minimizeObjectives)
+    fronts <- calculateParetoFronts(dominationMatrix)
+    
     for (i in 1:numIterations)
     # iterate for <numIterations> generations
     {
       if (verbose)
         cat("Iteration ",i,"\n",sep="")
       
-      # calculate crowding distances      
-      crowd <- apply(oldObjectiveValues,2,function(dim)
-         {
-          idx <- order(dim)
-          dim <- dim[idx]
-          
-          res <- sapply(1:length(dim),function(i)
-                 {
-                  if (i == 1)
-                    dim[2]-dim[1]
-                  else
-                  if (i == length(dim))
-                    dim[length(dim)]-dim[length(dim) - 1]
-                  else
-                    mean(c(dim[i]-dim[i-1],dim[i+1]-dim[i]))
-                 })
-          revidx <- order(idx)
-          return(res[revidx])
-        })
-      crowd <- apply(crowd,1,mean)
-      
-      # mating probability is based on the rank
-      # of the crowding distance
-      crowdProbs <- rank(crowd)
-      crowdProbs <- crowdProbs/sum(crowdProbs)      
-      
+      crowdingDistances <- crowdingDistance(oldObjectiveValues, fronts)
+
       # create offspring  
       candidates <- lapply(1:lambda, function(i)
                     {
-                      parents <- sample(1:length(individuals),size=2,replace=FALSE,prob=crowdProbs)
-                      mutate(recombine(individuals[[parents[1]]],individuals[[parents[2]]]),
+                      parents <- sample(seq_along(individuals),size=4,replace=FALSE)
+                      
+                      parent1 <- crowdedComparison(fronts$ranks[parents[1]],
+                                                   fronts$ranks[parents[2]],
+                                                   crowdingDistances[parents[1]],
+                                                   crowdingDistances[parents[2]])
+                      parent2 <- crowdedComparison(fronts$ranks[parents[3]],
+                                                   fronts$ranks[parents[4]],
+                                                   crowdingDistances[parents[3]],
+                                                   crowdingDistances[parents[4]]) + 2
+                                                                                               
+                      mutate(recombine(individuals[[parent1]],individuals[[parent2]]),
                              args)
                     })
+      
+      oldSeed <- .Random.seed
       
       # calculate fitness of offspring
       if (useSnowfall)
@@ -300,6 +302,8 @@ tunePareto <- function(..., data, labels,
                                  t(sapply(candidates, function(cand)calculateObjectiveVals(cand$individual))))
       }
       
+      .Random.seed <<- oldSeed
+      
       candidates <- c(individuals, candidates)
       
       # non-dominated sorting on candidates
@@ -308,11 +312,15 @@ tunePareto <- function(..., data, labels,
       
       remaining <- mu
       indices <- c()
-      for (front in fronts)
+      for (front in fronts$paretoFronts)
       {
+        if (remaining == 0)
+          break;
         if (remaining < length(front))
         {
-          indices <- c(indices, sample(front,size=remaining,replace=FALSE))
+          #indices <- c(indices, sample(front,size=remaining,replace=FALSE))
+          crowdingDistances <- crowdingDistance(objectiveValues[front, ,drop=FALSE], list(paretoFronts=list(seq_along(front))))
+          indices <- c(indices, front[order(crowdingDistances, decreasing=TRUE)[1:remaining]])
           break
         }
         else
@@ -324,13 +332,16 @@ tunePareto <- function(..., data, labels,
       
       individuals <- candidates[indices]
       oldObjectiveValues <- objectiveValues[indices,,drop=FALSE]
+      
+      dominationMatrix <- dominationMatrix[indices,indices,drop=FALSE]
+      fronts <- calculateParetoFronts(dominationMatrix)
     }
     
     # remove duplicate parameter configurations
-    combinations <- lapply(candidates,function(ind)ind$individual)
+    combinations <- lapply(individuals,function(ind)ind$individual)
     dup <- duplicated(combinations)
     combinations <- combinations[!dup]
-    
+    objectiveValues <- oldObjectiveValues[!dup,]
   }
   else
   {
@@ -353,7 +364,7 @@ tunePareto <- function(..., data, labels,
   # calculate optimal combinations
   if (verbose)
     cat("Calculating Pareto-optimal combinations...\n")
- 
+
   objectiveValues <- matrix(objectiveValues, nrow=length(combinations))[, groups$permutation, drop=FALSE]
   
   invalidEntries <- apply(objectiveValues,1,function(row)any(is.na(row)))
@@ -417,6 +428,53 @@ tunePareto <- function(..., data, labels,
   return(res)  
 }
 
+crowdedComparison <- function(front1, front2, crowd1, crowd2)
+{
+  if (front1 < front2)
+    return(1)
+  if (front2 < front1)
+    return(2)
+  if (crowd1 > crowd2)
+    return(1)
+  if (crowd2 > crowd1)
+    return(2)
+  return(sample(c(1,2),size=1))
+}
+
+crowdingDistance <- function(objectiveValues, fronts)
+{
+  crowd <- rep(NA,nrow(objectiveValues))
+  
+  for (front in fronts$paretoFronts)
+  {
+    if (length(front) == 1)
+      crowd[front] <- Inf
+    else
+      crowd[front] <- 
+      apply(apply(objectiveValues[front,,drop=FALSE],2,function(dim)
+       {
+        idx <- order(dim)
+        dim <- dim[idx]
+        
+        res <- sapply(seq_along(dim),function(i)
+               {
+                if (i == 1)
+                  Inf #dim[2]-dim[1]
+                else
+                if (i == length(dim))
+                  Inf#dim[length(dim)]-dim[length(dim) - 1]
+                else
+                  dim[i+1] - dim[i-1]
+                  #mean(c(dim[i]-dim[i-1],dim[i+1]-dim[i]))
+               })
+        revidx <- order(idx)
+        return(res[revidx])
+      }), 1, mean)    
+  }
+  return(crowd)
+}
+
+
 # Recombination method for two parents <parent1> and <parent2>
 # in the Evolution Strategies
 recombine <- function(parent1, parent2)
@@ -425,16 +483,17 @@ recombine <- function(parent1, parent2)
   child <- mapply(function(gene1, gene2, mut)
                   {
                      
-                     if (!is.na(mut))
+                     #if (!is.na(mut))
                      # this is a continuous gene
-                     {
-                       mean(gene1,gene2)
-                     }
-                     else
+                     #{
+                     # alpha <- runif(n=1)
+                     #  alpha*gene1+(1-alpha)*gene2
+                     #}
+                     #else
                      # this is a discrete gene
-                     {
+                     #{
                        sample(c(gene1,gene2),size=1)
-                     }
+                     #}
                   }, parent1$individual, parent2$individual, parent1$mutation,
                   SIMPLIFY=FALSE)
                   
@@ -462,8 +521,8 @@ mutate <- function(individual, ranges)
                                  if (is.na(mut))
                                    NA
                                  else
-                                  mut * exp(rnorm(mean=0,sd=1/sqrt(2*length(individual$mutation)),n=1) +
-                                            rnorm(mean=0,sd=1/sqrt(2*sqrt(length(individual$mutation))),n=1))
+                                   mut * exp(rnorm(mean=0,sd=1/sqrt(2*length(individual$mutation)),n=1) +
+                                             rnorm(mean=0,sd=1/sqrt(2*sqrt(length(individual$mutation))),n=1))
                                })
   
   # mutate the parameter values
@@ -515,7 +574,7 @@ recalculateParetoSet <- function(tuneParetoResult, objectives)
     stop("\"tuneParetoResult\" must be a TuneParetoResult object!")
   
   if (missing(objectives))
-    objectives <- 1:length(tuneParetoResult$minimizeObjectives)
+    objectives <- seq_along(tuneParetoResult$minimizeObjectives)
   
   combinations <- tuneParetoResult$testedCombinations
   objectiveValues <- tuneParetoResult$testedObjectiveValues[,objectives,drop=FALSE]

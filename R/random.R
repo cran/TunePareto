@@ -28,6 +28,6 @@ halton.getNext <- function(dimension)
 halton.sample <- function(n,dimension)
 {
   # random initialization
-  randEnv[["halton.state"]] <- sample(1:1000,size=1)
+  randEnv[["halton.state"]] <- 0
   return(sapply(1:(n*dimension),function(x)halton.getNext(dimension)))
 }
