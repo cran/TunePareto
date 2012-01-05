@@ -10,9 +10,9 @@ Print method for objects used in TunePareto
 Customized printing methods for several objects used in TunePareto: For \code{TuneParetoResult} objects, the Pareto-optimal parameter configurations are printed. For \code{TuneParetoClassifier} and \code{TuneParetoModel} objects, information on the classifier and its parameters is printed.
 }
 \usage{
-print.TuneParetoResult(x, ...)
-print.TuneParetoClassifier(x, ...)
-print.TuneParetoModel(x, ...)
+\method{print}{TuneParetoResult}(x, ...)
+\method{print}{TuneParetoClassifier}(x, ...)
+\method{print}{TuneParetoModel}(x, ...)
 }
 \arguments{
   \item{x}{An object of class \code{TuneParetoResult}, \code{TuneParetoClassifier} or \code{TuneParetoModel} to be printed.

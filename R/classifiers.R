@@ -106,6 +106,7 @@ tunePareto.svm <- function()
                                                        "coef0", "cost", "nu",
                                                        "class.weights", "cachesize", 
                                                        "tolerance", "epsilon",
+                                                       "scale", "shrinking", "fitted",
                                                        "subset", "na.action"),
                               useFormula = FALSE,
                               trainDataName = "x",

@@ -7,7 +7,7 @@ Prediction method for TuneParetoClassifier objects
 S3 method that predicts the labels of unknown samples using a trained \code{TunePareteModel} model of a \code{TuneParetoClassifier} object.
 }
 \usage{
-predict.TuneParetoModel(object, newdata, ...)
+\method{predict}{TuneParetoModel}(object, newdata, ...)
 }
 
 \arguments{

@@ -12,9 +12,9 @@ Generic methods for parameter tuning of classification algorithms using multiple
 \tabular{ll}{
 Package: \tab TunePareto\cr
 Type: \tab Package\cr
-Version: \tab 2.1\cr
-Date: \tab 2011-07-29\cr
-License: \tab Artistic-2.0 \cr
+Version: \tab 2.2\cr
+Date: \tab 2012-01-05\cr
+License: \tab GPL-2 | Artistic-2.0 \cr
 LazyLoad: \tab yes\cr
 }
 The methods of this package allow to assess the performance of classifiers with respect to certain parameter values and multiple scoring functions, such as the cross-validation error or the sensitivity. It provides the \code{\link{tunePareto}} function which can be configured to run most common classification methods implemented in R. Several sampling strategies for parameters are supplied, including Latin Hypercube sampling, quasi-random sequences, and evolutionary algorithms.
@@ -29,6 +29,10 @@ A number of predefined scoring functions are provided (see \code{\link{predefine
 Christoph Müssel, Hans Kestler
 
 Maintainer: Hans Kestler <hans.kestler@uni-ulm.de>
+}
+
+\references{
+Christoph Müssel, Ludwig Lausser, Markus Maucher, Hans A. Kestler (2012). Multi-Objective Parameter Selection for Classifiers. Journal of Statistical Software, 46(5), 1-27. URL http://www.jstatsoft.org/v46/i05/.
 }
 
 \keyword{package

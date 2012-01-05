@@ -33,7 +33,9 @@ tunePareto.NaiveBayes()
 \code{kernel, degree, gamma, 
       coef0, cost, nu, 
       class.weights, cachesize, 
-      tolerance, epsilon, subset, na.action}
+      tolerance, epsilon, 
+      scale, shrinking, fitted,
+      subset, na.action}
 
 \code{tunePareto.tree} encapsulates the CART classifier \code{\link[tree]{tree}} in package \pkg{tree}. The classifier allows for supplying and tuning the following parameters: 
 

@@ -1,0 +1,22 @@
+citHeader("To cite TunePareto in publications use:")
+
+citEntry(entry = "Article",
+  title        = "Multi-Objective Parameter Selection for Classifiers",
+  author       = personList(as.person("Christoph M\\\"ussel"),
+                   as.person("Ludwig Lausser"),
+                   as.person("Markus Maucher"),
+                   as.person("Hans A. Kestler")),
+  journal      = "Journal of Statistical Software",
+  year         = "2012",
+  volume       = "46",
+  number       = "5",
+  pages        = "1--27",
+  url          = "http://www.jstatsoft.org/v46/i05/",
+
+  textVersion  =
+  paste("Christoph Müssel, Ludwig Lausser, Markus Maucher, Hans A. Kestler (2012).",
+        "Multi-Objective Parameter Selection for Classifiers.",
+        "Journal of Statistical Software, 46(5), 1-27.",
+        "URL http://www.jstatsoft.org/v46/i05/.")
+)
+
