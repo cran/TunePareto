@@ -63,9 +63,9 @@ If the classifier has separate training and prediction functions, a named list o
 }
 Additionally, the function can have further parameters which are supplied in \code{precalculationParams}. To train a classifier and obtain predictions, the precalculation function can call the generic \if{latex}{\cr}\code{\link{trainTuneParetoClassifier}} and \code{\link{predict.TuneParetoModel}} functions. 
 
-The precalculation function usually returns the predicted labels and the true labels, but the only requirement of the return value is that it can be processed by the corresponding objective function. Predefined precalculation functions are \code{\link{reclassification}} and \code{\link{crossValidation}}.
+The precalculation function usually returns the predicted labels, the true labels and the model, but the only requirement of the return value is that it can be processed by the corresponding objective function. Predefined precalculation functions are \code{\link{reclassification}} and \code{\link{crossValidation}}.
 
-The objective function has a single obligatory parameter named \code{result} which supplies the result of the precalculation. Furthermore, optional parameters can be specified. Their values are taken from \code{objectiveFunctionParams}. The function returns a number specifying the objective value.
+The objective function has a single obligatory parameter named \code{result} which supplies the result of the precalculation. Furthermore, optional parameters can be specified. Their values are taken from \code{objectiveFunctionParams}. The function either returns a single number specifying the objective value, or a list with a \code{score} component containing the objective value and a \code{additionalData} component that contains additional information to be stored in the \code{additionalData} component of the \code{TuneParetoResult} object (see \code{\link{tunePareto}}).
 
 }
 \value{
@@ -86,52 +86,42 @@ Retuns an object of class \code{TuneParetoObjective} with the following componen
 }
 \examples{
 
-# create new objective minimizing the
-# false positives of a reclassification
+# create new objective minimizing the number of support vectors
+# for a support vector machine
 
-cvFalsePositives <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, foldList=NULL, caseClass)
+reclassSupportVectors <- function (saveModel = FALSE) 
 {
-  return(createObjective(
-            precalculationFunction = "crossValidation",
-            precalculationParams = list(nfold=nfold, 
-                                        ntimes=ntimes, 
-                                        leaveOneOut=leaveOneOut,
-                                        foldList=foldList),
-            objectiveFunction = 
-            function(result, caseClass)
-            {
-             
-              # take mean value over the cv runs
-              return(mean(sapply(result,
-                    function(run)
-                    # iterate over runs of cross-validation
-                    {
-                      # extract all predicted labels in the folds
-                      predictedLabels <- 
-                            unlist(lapply(run,
-                                         function(fold)fold$predictedLabels))
-    
-                      # extract all true labels in the folds
-                      trueLabels <- 
-                            unlist(lapply(run,
-                                          function(fold)fold$trueLabels))
-                      
-                      # calculate number of false positives in the run
-                      return(sum(predictedLabels == caseClass & 
-                                 trueLabels != caseClass))
-                    })))
-            },
-            objectiveFunctionParams = list(caseClass=caseClass),
-            direction = "minimize",        
-            name = "CV.FalsePositives"))                  
+    createObjective(precalculationFunction = reclassification, 
+        precalculationParams = NULL, objectiveFunction = 
+        function(result, saveModel) 
+        {
+	        if(result$model$classifier$name != "svm")
+		        stop("This objective function can only be applied 
+		              to classifiers of type tunePareto.svm()")
+
+      		res <- result$model$model$tot.nSV
+
+		      if (saveModel) 
+		      # return a list containing the objective value as well as the model
+		      {
+		         return(list(additionalData = result$model, fitness = res))
+		      }
+		      else 
+		      # only return the objective value
+		        return(res)
+        }, 
+        objectiveFunctionParams = list(saveModel = saveModel), 
+        direction = "minimize", 
+        name = "Reclass.SupportVectors")
 }
 
-# use the objective in an SVM cost parameter tuning on the 'iris' data set
+# tune error vs. number of support vectors on the 'iris' data set
 r <- tunePareto(data = iris[, -ncol(iris)], 
                 labels = iris[, ncol(iris)],
                 classifier = tunePareto.svm(),
                 cost=c(0.001,0.005,0.01,0.05,0.1,0.5,1,5,10,50),
-                objectiveFunctions=list(cvFalsePositives(10, 10, caseClass="setosa")))
+                objectiveFunctions=list(reclassError(), reclassSupportVectors()))
+
 print(r)
 }
 \keyword{objective function

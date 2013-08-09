@@ -23,6 +23,7 @@ A \code{TuneParetoResult} object containing the parameter configurations of all 
 \code{\link{tunePareto}}, \code{\link{recalculateParetoSet}}
 }
 \examples{
+\donttest{
 # optimize an SVM with small costs on 
 # the 'iris' data set
 r1 <- tunePareto(classifier = tunePareto.svm(),
@@ -44,6 +45,7 @@ print(r2)
 
 # merge the results
 print(mergeTuneParetoResults(r1,r2))
+}
 }
 
 \keyword{merge results}

@@ -103,8 +103,10 @@ An object of class \code{TuneParetoClassifier} with components corresponding to 
                    data = iris[, -ncol(iris)], 
                    labels = iris[, ncol(iris)],
                    cost = c(0.001,0.01,0.1,1,10), 
-                   objectiveFunctions=list(cvError(10, 10),
-                                           cvSpecificity(10, 10, caseClass="setosa"))))                           
+                   objectiveFunctions=
+                     list(cvError(10, 10),
+                          cvSpecificity(10, 10, 
+                            caseClass="setosa"))))                           
 }
 
 \keyword{TuneParetoClassifier}

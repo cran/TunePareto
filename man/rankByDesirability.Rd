@@ -32,6 +32,7 @@ A matrix of objective values with an additional column for the desirability inde
 \code{\link[desire]{harrington1}}, \code{\link[desire]{harrington2}}, \code{\link[desire]{geometricDI}}, \code{\link[desire]{geometricDI}}, \code{\link[desire]{meanDI}}, \code{\link[desire]{minimumDI}}
 }
 \examples{
+\donttest{
 library(desire)
 
 # optimize the 'cost' parameter of an SVM on
@@ -54,6 +55,7 @@ di <- geometricDI(d1,d2,d3)
 
 # rank all tuning results according to their desirabilities
 print(rankByDesirability(res,di,optimalOnly=FALSE))
+}
 }
 
 \keyword{desirability function}

@@ -40,7 +40,7 @@ If the classifier consists of separate training and prediction functions, a name
 The number of groups of the cross-validation. Ignored if \code{leaveOneOut=TRUE}.
 }
   \item{ntimes}{
-The number of repeated runs of the cross-validation.
+The number of repeated runs of the cross-validation. Ignored if \code{leaveOneOut=TRUE}.
 }
   \item{leaveOneOut}{
 If this is true, a leave-one-out cross-validation is performed, i.e. each sample is left out once in the training phase and used as a test sample
@@ -66,11 +66,13 @@ If this parameter is set, the other cross-validation parameters (\code{ntimes}, 
 \describe{
 \item{trueLabels}{The original labels of the dataset as supplied in \code{labels}}
 \item{predictedLabels}{A vector of predicted labels of the data set}
+\item{model}{The \code{TuneParetoModel} object resulting from the classifier training}
 }
 \code{crossValidation} returns a nested list structure. At the top level, there is one list element for each run of the cross-validation. Each of these elements consists of a list of sub-structures for each fold. The sub-structures have the following components:
 \describe{
 \item{trueLabels}{The original labels of the test samples in the fold}
 \item{predictedLabels}{A vector of predicted labels of the test samples in the fold}
+\item{model}{The \code{TuneParetoModel} object resulting from the classifier training in the fold}
 }
 That is, for a cross-validation with \code{n} runs and \code{m} folds, there are \code{n} top-level lists, each having \code{m} sub-lists comprising the true labels and the predicted labels.
 }
@@ -80,7 +82,7 @@ That is, for a cross-validation with \code{n} runs and \code{m} folds, there are
 \code{\link{createObjective}}, \code{\link{generateCVRuns}}. 
 }
 \examples{
-
+\donttest{
 # create new objective minimizing the
 # false positives of a reclassification
 
@@ -128,6 +130,7 @@ r <- tunePareto(data = iris[, -ncol(iris)],
                 cost = c(0.001,0.005,0.01,0.05,0.1,0.5,1,5,10,50),
                 objectiveFunctions=list(cvFalsePositives(10, 10, caseClass="setosa")))
 print(r)
+}
 }
 
 \keyword{objective function

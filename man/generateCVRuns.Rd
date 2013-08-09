@@ -23,7 +23,7 @@ A vector of class labels of the data set to be used for the cross-validation.
 The number of groups of the cross-validation. Ignored if \code{leaveOneOut=TRUE}.
 }
   \item{ntimes}{
-The number of repeated runs of the cross-validation.
+The number of repeated runs of the cross-validation. Ignored if \code{leaveOneOut=TRUE}.
 }
   \item{leaveOneOut}{
 If this is true, a leave-one-out cross-validation is performed, i.e. each sample is left out once in the training phase and used as a test sample

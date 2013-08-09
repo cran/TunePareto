@@ -107,12 +107,13 @@ Returns a list of class \code{TuneParetoResult} with the following components:
 \item{testedObjectiveValues}{A matrix containing the objective function values of all tested configurations with the same structure as \code{bestObjectiveValues}.}
 \item{dominationMatrix}{A Boolean matrix specifying which parameter configurations dominate each other. If a configuration \code{i} dominates a configuration \code{j}, the entry in the \code{i}th row and the \code{j}th column is \code{TRUE}.}
 \item{minimizeObjectives}{A Boolean vector specifying which of the objectives are minimization objectives. This is derived from the objective functions supplied to \code{tunePareto}.}
+\item{additionalData}{A list containing additional data that may have been returned by the objective functions. The list has one element for each tested parameter configuration, each comprising one sub-element for each objective function that returned additional data. The structure of these sub-elements depends on the corresponding objective function. For example, the predefined objective functions (see \code{\link{predefinedObjectiveFunctions}}) save the trained models here if \code{saveModel} is true.}
 }
 \seealso{
 \code{\link{predefinedClassifiers}}, \code{\link{predefinedObjectiveFunctions}}, \code{\link{createObjective}}, \code{\link{allCombinations}}
 }
 \examples{
-
+\donttest{
 
 # tune 'k' of a k-NN classifier 
 # on two classes of the 'iris' data set --
@@ -166,7 +167,7 @@ print(tunePareto(data = iris[, -ncol(iris)],
                  objectiveFunctions = list(cvError(10, 10),
                                            cvSensitivity(10, 10, caseClass="setosa"),
                                            cvSpecificity(10, 10, caseClass="setosa"))))}
-
+}
 }
 \keyword{parameter tuning
          multi-objective optimization

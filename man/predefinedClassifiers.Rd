@@ -71,6 +71,7 @@ Returns objects of class \code{TuneParetoClassifier} as described in \code{\link
 \code{\link{tuneParetoClassifier}}, \code{\link{tunePareto}}, \code{\link{trainTuneParetoClassifier}}
 }
 \examples{
+\donttest{
 # tune a k-NN classifier with different 'k' and 'l' 
 # on the 'iris' data set
 print(tunePareto(classifier = tunePareto.knn(),
@@ -122,6 +123,7 @@ print(tunePareto(classifier = tunePareto.NaiveBayes(),
                  objectiveFunctions=list(cvError(10, 10),
                                          cvSpecificity(10, 10, caseClass="setosa"))))
                              
+}
 }
 
 \keyword{TuneParetoClassifier,

@@ -71,6 +71,7 @@ This function does not have a return value.
 \code{\link{tunePareto}}, \code{\link{plotDominationGraph}}
 }
 \examples{
+\donttest{
 # optimize the 'cost' parameter according
 # to CV error and CV Specificity on the 'iris' data set
 r <- tunePareto(data = iris[, -ncol(iris)], 
@@ -82,6 +83,7 @@ r <- tunePareto(data = iris[, -ncol(iris)],
                    
 # plot the Pareto graph
 plotParetoFronts2D(r)
+}
 }
 \keyword{multi-objective optimization
          MOO

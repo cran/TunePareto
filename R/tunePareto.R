@@ -74,6 +74,7 @@ tunePareto <- function(..., data, labels,
   }
   
   labels <- as.factor(as.character(labels))
+  objectiveFunctionNames <- sapply(objectiveFunctions,function(obj)obj$name)
  
   if (!missing(objectiveBoundaries))
   {
@@ -166,8 +167,9 @@ tunePareto <- function(..., data, labels,
        }
        
         # calculate objective function values for configuration
-        res <- unlist(lapply(groupedObjectives,function(objective)
-              {                 
+        res <- list()
+        for (objective in groupedObjectives)#lapply(groupedObjectives,function(objective)
+        {                 
                 
                 if (keepSeed)
                 {
@@ -184,6 +186,11 @@ tunePareto <- function(..., data, labels,
                 
                 params <- c(params, as.list(objective$precalculationParams))
                 
+                if (is.function(objective$objectiveFunction))
+                     r <- list(NA)
+                   else
+                     r <- rep(NA,length(objective$objectiveFunction))
+                     
                 tryCatch(
                 {
                    # call precalculation
@@ -192,17 +199,17 @@ tunePareto <- function(..., data, labels,
                   # call associated objective functions
                   if (is.function(objective$objectiveFunction))
                   {                                 
-                    return(do.call(objective$objectiveFunction,
+                    r <- list(do.call(objective$objectiveFunction,
                             append(list(result=precalc), objective$objectiveFunctionParams)))
 		                  
 		              }
                   else
                   {
                       
-                    return(mapply(function(func, params)
+                    r <- mapply(function(func, params)
                            {
                               do.call(func, append(list(result=precalc),unlist(params,recursive=FALSE)))
-                           }, objective$objectiveFunction, objective$objectiveFunctionParams))
+                           }, objective$objectiveFunction, objective$objectiveFunctionParams, SIMPLIFY=FALSE)
                    }
                  },
                  error = function(e)
@@ -211,14 +218,49 @@ tunePareto <- function(..., data, labels,
                    allParams <- unlist(parameters, recursive=FALSE)
                    warning(paste("Combination",
                            paste(paste(names(allParams),"=",allParams), collapse=", "),"returned an error:",e))
-                   if (is.function(objective$objectiveFunction))
-                     NA
-                   else
-                     rep(NA,length(objective$objectiveFunction))
+                   #if (is.function(objective$objectiveFunction))
+                   #  r <- list(NA)
+                   #else
+                   #  r <- rep(NA,length(objective$objectiveFunction))
                  })
-              }))
+                 #print(names(r))
+                 #print(length(res))
+                 res <- c(res,r)
+         }
+         #cat("Res: ")
+         #print(length(res))
+         #print(res)
+         #return(unlist(res,recursive=FALSE))
          return(res)
       }
+      
+  extractObjectiveVal <- function(x)
+    {
+      #ovv <<- x
+      return(sapply(x, function(val)
+      {
+        if (length(val) == 1)
+          return(val)
+        else
+          return(val$fitness)
+      }))
+    }
+    
+  extractAdditionalData <- function(x)
+  {
+    res <- sapply(x, function(val)
+    {
+      if (length(val) == 1)
+        return(NULL)
+      else
+        return(val$additionalData)
+    })
+    #print(x)
+    #print(res)
+    names(res) <- objectiveFunctionNames
+    res <- res[!sapply(res,is.null)]
+    return(res)
+  }
   
   if (sampleType == "evolution")
   # switch to Evolution Strategies
@@ -243,15 +285,17 @@ tunePareto <- function(..., data, labels,
       # export objects and functions needed in the cluster   
       sfExport("data","labels","classifier","keepSeed","seed",
                "groupedObjectives","useSnowfall","verbose","meaningfulParams")
-               
+      
       # parallel evaluation of combinations in cluster
-      oldObjectiveValues <- t(sfSapply(individuals, function(cand)calculateObjectiveVals(cand$individual)))
+      ov <- sfLapply(individuals, function(cand)calculateObjectiveVals(cand$individual))
     }
     else
     {
       # sequential evaluation of combinations
-      oldObjectiveValues <- t(sapply(individuals, function(cand)calculateObjectiveVals(cand$individual)))
+      ov <- lapply(individuals, function(cand)calculateObjectiveVals(cand$individual))
     }
+    oldObjectiveValues <- t(sapply(ov, extractObjectiveVal))
+    oldAddData <- lapply(ov, extractAdditionalData)
     
     dominationMatrix <- calculateDominationMatrix(oldObjectiveValues[, groups$permutation], minimizeObjectives)
     fronts <- calculateParetoFronts(dominationMatrix)
@@ -290,17 +334,20 @@ tunePareto <- function(..., data, labels,
         # export objects and functions needed in the cluster   
         sfExport("data","labels","classifier","keepSeed","seed",
                  "groupedObjectives","useSnowfall","verbose","meaningfulParams")
-                 
+                         
         # parallel evaluation of combinations in cluster
-        objectiveValues <- rbind(oldObjectiveValues,
-                                 t(sfSapply(candidates, function(cand)calculateObjectiveVals(cand$individual))))
+        ov <- sfLapply(candidates, function(cand)calculateObjectiveVals(cand$individual))
+
       }
       else
       {
         # sequential evaluation of combinations
-        objectiveValues <- rbind(oldObjectiveValues,
-                                 t(sapply(candidates, function(cand)calculateObjectiveVals(cand$individual))))
+        ov <- lapply(candidates, function(cand)calculateObjectiveVals(cand$individual))
       }
+      objectiveValues <- rbind(oldObjectiveValues,
+                               t(sapply(ov, extractObjectiveVal)))
+
+      addData <- c(oldAddData, lapply(ov, extractAdditionalData))
       
       .Random.seed <<- oldSeed
       
@@ -332,6 +379,7 @@ tunePareto <- function(..., data, labels,
       
       individuals <- candidates[indices]
       oldObjectiveValues <- objectiveValues[indices,,drop=FALSE]
+      oldAddData <- addData[indices]
       
       dominationMatrix <- dominationMatrix[indices,indices,drop=FALSE]
       fronts <- calculateParetoFronts(dominationMatrix)
@@ -342,6 +390,7 @@ tunePareto <- function(..., data, labels,
     dup <- duplicated(combinations)
     combinations <- combinations[!dup]
     objectiveValues <- oldObjectiveValues[!dup,]
+    addData <- addData[!dup]
   }
   else
   {
@@ -352,13 +401,16 @@ tunePareto <- function(..., data, labels,
                "groupedObjectives","useSnowfall","verbose","meaningfulParams")
                
       # parallel evaluation of combinations in cluster
-      objectiveValues <- t(sfSapply(combinations, calculateObjectiveVals))
+      ov <- sfLapply(combinations, calculateObjectiveVals)
     }
     else
     {
       # sequential evaluation of combinations
-      objectiveValues <- t(sapply(combinations, calculateObjectiveVals))
+      ov <- lapply(combinations, calculateObjectiveVals)
     }
+    #print(ov)
+    objectiveValues <- t(sapply(ov, extractObjectiveVal))
+    addData <- lapply(ov, extractAdditionalData)
   }
   
   # calculate optimal combinations
@@ -370,8 +422,9 @@ tunePareto <- function(..., data, labels,
   invalidEntries <- apply(objectiveValues,1,function(row)any(is.na(row)))
   objectiveValues <- objectiveValues[!invalidEntries,,drop=FALSE]
   combinations <- combinations[!invalidEntries]
+  addData <- addData[!invalidEntries]
                          
-  colnames(objectiveValues) <- sapply(objectiveFunctions,function(obj)obj$name)                        
+  colnames(objectiveValues) <- objectiveFunctionNames                        
     
   rownames(objectiveValues) <- sapply(combinations, 
                                       function(comb)
@@ -389,7 +442,9 @@ tunePareto <- function(..., data, labels,
                                           paste(paste(names(comb),"=",comb), collapse=", ")
                                       })
                                       
-  names(minimizeObjectives) <- colnames(objectiveValues)                                      
+  names(addData) <- rownames(objectiveValues)
+                                      
+  names(minimizeObjectives) <- objectiveFunctionNames                                      
 
   # calculate a matrix specifying which configuration is dominated by which other combination
   domination <- calculateDominationMatrix(objectiveValues, minimizeObjectives)
@@ -416,10 +471,12 @@ tunePareto <- function(..., data, labels,
   }
 
   # build result list                                      
-  res <- list(bestCombinations=combinations[!dominated], 
-              bestObjectiveValues=objectiveValues[!dominated,,drop=FALSE],
-              testedCombinations=combinations,
-              testedObjectiveValues=objectiveValues,
+  res <- list(bestCombinations = combinations[!dominated], 
+              bestObjectiveValues = objectiveValues[!dominated,,drop=FALSE],
+              bestAdditionalData = addData[!dominated],
+              testedCombinations = combinations,
+              testedObjectiveValues = objectiveValues,
+              additionalData = addData,
               minimizeObjectives = minimizeObjectives,
               objectiveBoundaries =  if (missing(objectiveBoundaries)){NULL}
                                     else {objectiveBoundaries},
@@ -580,6 +637,8 @@ recalculateParetoSet <- function(tuneParetoResult, objectives)
   objectiveValues <- tuneParetoResult$testedObjectiveValues[,objectives,drop=FALSE]
   minimizeObjectives <- tuneParetoResult$minimizeObjectives[objectives]
   objectiveBoundaries <- tuneParetoResult$objectiveBoundaries[objectives]
+  additionalData <- lapply(tuneParetoResult$additionalData,
+                           function(x)x[intersect(names(x),names(minimizeObjectives))])
   
   dominationMatrix <- calculateDominationMatrix(objectiveValues, minimizeObjectives)
   
@@ -602,13 +661,15 @@ recalculateParetoSet <- function(tuneParetoResult, objectives)
   }
 
   # build result list                                      
-  res <- list(bestCombinations=combinations[!dominated], 
-              bestObjectiveValues=objectiveValues[!dominated,,drop=FALSE],
-              testedCombinations=combinations,
-              testedObjectiveValues=objectiveValues,
+  res <- list(bestCombinations = combinations[!dominated], 
+              bestObjectiveValues = objectiveValues[!dominated,,drop=FALSE],
+              bestAdditionalData = additionalData[!dominated],
+              testedCombinations = combinations,
+              testedObjectiveValues = objectiveValues,
+              additionalData = additionalData,
               minimizeObjectives = minimizeObjectives,
               objectiveBoundaries =  objectiveBoundaries,
-              dominationMatrix=dominationMatrix)
+              dominationMatrix = dominationMatrix)
   class(res) <- "TuneParetoResult"  
   return(res)
 }
@@ -631,6 +692,7 @@ mergeTuneParetoResults <- function(...)
   {
     res$testedCombinations <- c(res$testedCombinations, el$testedCombinations)
     res$testedObjectiveValues <- rbind(res$testedObjectiveValues, el$testedObjectiveValues)
+    res$additionalData <- c(res$additionalData, el$additionalData)
   }
   
   return(recalculateParetoSet(res))  

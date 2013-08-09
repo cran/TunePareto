@@ -12,9 +12,9 @@ Generic methods for parameter tuning of classification algorithms using multiple
 \tabular{ll}{
 Package: \tab TunePareto\cr
 Type: \tab Package\cr
-Version: \tab 2.2\cr
-Date: \tab 2012-01-05\cr
-License: \tab GPL-2 | Artistic-2.0 \cr
+Version: \tab 2.3\cr
+Date: \tab 2013-08-09\cr
+License: \tab GPL-2 \cr
 LazyLoad: \tab yes\cr
 }
 The methods of this package allow to assess the performance of classifiers with respect to certain parameter values and multiple scoring functions, such as the cross-validation error or the sensitivity. It provides the \code{\link{tunePareto}} function which can be configured to run most common classification methods implemented in R. Several sampling strategies for parameters are supplied, including Latin Hypercube sampling, quasi-random sequences, and evolutionary algorithms.
@@ -26,7 +26,7 @@ The method tests combinations of the supplied classifier parameters according to
 A number of predefined scoring functions are provided (see \code{\link{predefinedObjectiveFunctions}}), but the user is free to implement own scores (see \code{\link{createObjective}}).
 }
 \author{
-Christoph Müssel, Hans Kestler
+Christoph Müssel, Ludwig Lausser, Hans Kestler
 
 Maintainer: Hans Kestler <hans.kestler@uni-ulm.de>
 }
@@ -39,7 +39,7 @@ Christoph Müssel, Ludwig Lausser, Markus Maucher, Hans A. Kestler (2012). Multi
          multi-objective parameter tuning}
 
 \examples{
-
+\donttest{
 # optimize the 'cost' and 'kernel' parameters of an SVM according
 # to CV error and CV Specificity on the 'iris' data set
 # using several predefined values for the cost
@@ -58,9 +58,9 @@ print(r)
 # use a continuous interval for the 'cost' parameter 
 # and optimize it using evolutionary algorithms and
 # parallel execution with snowfall
-\donttest{library(snowfall)}
-\donttest{sfInit(parallel=TRUE, cpus=2, type="SOCK")}
-\donttest{r <- tunePareto(data = iris[, -ncol(iris)], 
+library(snowfall)
+sfInit(parallel=TRUE, cpus=2, type="SOCK")
+r <- tunePareto(data = iris[, -ncol(iris)], 
                  labels = iris[, ncol(iris)],
                  classifier = tunePareto.svm(), 
                  cost = as.interval(0.001,10), 
@@ -72,12 +72,12 @@ print(r)
                  objectiveFunctions = list(cvError(10, 10),
                                            cvSensitivity(10, 10, caseClass="setosa"),
                                            cvSpecificity(10, 10, caseClass="setosa")),
-                useSnowfall=TRUE)}
-\donttest{sfStop()}
+                useSnowfall=TRUE)
+sfStop()
 
 # print Pareto-optimal solutions
 print(r)
 
 # plot the Pareto fronts
-\donttest{plotDominationGraph(r, legend.x="topright")}
+plotDominationGraph(r, legend.x="topright")}
 }

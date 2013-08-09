@@ -102,7 +102,7 @@ reclassification <- function(data, labels, classifier, classifierParams, predict
   
   #labels <- as.integer(as.character(labels))
 
-  res <- list(predictedLabels=predictedLabs, trueLabels=labels)
+  res <- list(predictedLabels=predictedLabs, trueLabels=labels, model=train)
   class(res) <- "ClassificationResult"
                              
   return(res)
@@ -114,6 +114,9 @@ reclassification <- function(data, labels, classifier, classifierParams, predict
 generateCVRuns <- function(labels, ntimes = 10, nfold = 10, 
                            leaveOneOut=FALSE, stratified = FALSE)
 {
+  if(leaveOneOut)
+	ntimes <- 1
+
   numSamples <- length(labels)
   res <- lapply(1:ntimes,function(run)
   # for each run
@@ -154,8 +157,10 @@ generateCVRuns <- function(labels, ntimes = 10, nfold = 10,
 		    })
 		  }
 	  }
+	  names(indices) <- paste("Fold ",1:nfold)
 	  return(indices)
 	})
+	names(res) <- paste("Run ", 1:ntimes)
 	return(res)
 }
 
@@ -203,7 +208,7 @@ crossValidation <- function(data, labels, classifier, classifierParams, predicto
       res1 <- do.call(predict,arglist)
 	        
       # return the true labels and the predicted labels
-      res1 <- list(predictedLabels=res1, trueLabels=testLabels)
+      res1 <- list(predictedLabels=res1, trueLabels=testLabels, model=train)
       class(res1) <- "ClassificationResult"
 	    return(res1)
 	  }))
@@ -211,97 +216,336 @@ crossValidation <- function(data, labels, classifier, classifierParams, predicto
 	return(res)
 }
 
-# Predefined objective calculating the sensitivity
+# Predefined objective calculating the accuracy
 # of a reclassification experiment
-reclassSensitivity <- function(caseClass)
+reclassAccuracy <- function(saveModel = FALSE)
 {
   createObjective(precalculationFunction = reclassification,
                   precalculationParams = NULL,
-                  objectiveFunction = function(result, caseClass)
-                                      {
-                                        return(sum(result$predictedLabels[result$trueLabels == caseClass] 
-                                                    == caseClass,na.rm=TRUE) / 
-                                               sum(result$trueLabels == caseClass))
-                                      },
-                  objectiveFunctionParams = list(caseClass=caseClass),
-                  direction="maximize",
-                  name="Reclass.Sensitivity")
+                  objectiveFunction = function(result, saveModel)
+                  {
+                    res <- sum(result$predictedLabels == result$trueLabels, na.rm = TRUE)/length(result$trueLabels)
+                    if (saveModel)
+                    {
+                      return(list(additionalData = result$model, fitness = res))
+                    }
+                    else
+                      return(res)                                            
+                  },
+                  objectiveFunctionParams = list(saveModel = saveModel),
+                  direction = "maximize",
+                  name = "Reclass.Accuracy")
 }
-
-# Predefined objective calculating the specificity
-# of a reclassification experiment
-reclassSpecificity <- function(caseClass)
-{
-  createObjective(precalculationFunction = reclassification,
-                  precalculationParams = NULL,
-                  objectiveFunction = function(result, caseClass)
-                                      {
-                                        return(sum(result$predictedLabels[result$trueLabels != caseClass] 
-                                                    != caseClass,na.rm=TRUE) / 
-                                               sum(result$trueLabels != caseClass))
-                                      },
-                  objectiveFunctionParams = list(caseClass=caseClass),                                      
-                  direction="maximize",
-                  name="Reclass.Specificity")
-}
-
-# Predefined objective calculating the confusion of two classes
-# in a reclassification experiment
-reclassConfusion <- function(trueClass, predictedClass)
-{
-  createObjective(precalculationFunction = reclassification,
-                  precalculationParams = NULL,
-                  objectiveFunction = function(result, trueClass, predictedClass)
-                                      {
-                                        return(sum(result$predictedLabels[result$trueLabels == trueClass]
-                                                    == predictedClass,na.rm=TRUE) / 
-                                               sum(result$trueLabels == trueClass))
-                                      },
-                  objectiveFunctionParams = list(trueClass=trueClass, predictedClass=predictedClass),
-                  direction="minimize",
-                  name="Reclass.Confusion")
-}
-
 
 # Predefined objective calculating the error percentage
 # of a reclassification experiment
-reclassError <- function()
+reclassError <- function(saveModel=FALSE)
 {
   createObjective(precalculationFunction = reclassification,
                   precalculationParams = NULL,
-                  objectiveFunction = function(result)
-                                      {
-                                        sum(is.na(result$predictedLabels) | 
-                                            result$predictedLabels != result$trueLabels) / 
-                                        length(result$trueLabels)
-                                      },
+                  objectiveFunction = function(result, saveModel)
+                  {
+                    res <- sum(is.na(result$predictedLabels) | 
+                                 result$predictedLabels != result$trueLabels) / 
+                      length(result$trueLabels)
+                    if (saveModel)
+                    {
+                      return(list(additionalData=result$model, fitness=res))
+                    }
+                    else
+                      return(res)                                             
+                  },
+                  objectiveFunctionParams = list(saveModel=saveModel),                                      
                   direction="minimize",
                   name="Reclass.Error")
 }
 
 # Predefined objective calculating the weighted error percentage
 # of a reclassification experiment 
-reclassWeightedError <- function()
+reclassWeightedError <- function(saveModel=FALSE)
 {
   createObjective(precalculationFunction = reclassification,
                   precalculationParams = NULL,
-                  objectiveFunction = function(result)
-                                      {
-                                        classes <- sort(unique(result$trueLabels))
-                                        sum(sapply(classes,function(cl)
-                                            {
-                                              sum(result$trueLabels == cl &
-                                                  result$predictedLabels != cl)/
-                                              sum(result$trueLabels == cl)
-                                            })) / length(classes)
-                                      },
+                  objectiveFunction = function(result, saveModel)
+                  {
+                    classes <- sort(unique(result$trueLabels))
+                    res <- sum(sapply(classes,function(cl)
+                    {
+                      sum(result$trueLabels == cl &
+                            result$predictedLabels != cl)/
+                        sum(result$trueLabels == cl)
+                    })) / length(classes)
+                    if (saveModel)
+                    {
+                      return(list(additionalData=result$model, fitness=res))
+                    }
+                    else
+                      return(res)       
+                  },
+                  objectiveFunctionParams = list(saveModel=saveModel),                                      
                   direction="minimize",
                   name="Reclass.WeightedError")
 }
 
+# Predefined objective calculating the sensitivity
+# of a reclassification experiment
+reclassSensitivity <- function(caseClass, saveModel=FALSE)
+{
+  createObjective(precalculationFunction = reclassification,
+                  precalculationParams = NULL,
+                  objectiveFunction = function(result, caseClass, saveModel)
+                                      {
+                                        res <- sum(result$predictedLabels[result$trueLabels == caseClass] 
+                                                    == caseClass,na.rm=TRUE) / 
+                                               sum(result$trueLabels == caseClass)
+                                        if (saveModel)
+                                        {
+                                          return(list(additionalData=result$model, fitness=res))
+                                        }
+                                        else
+                                          return(res)                
+                                      },
+                  objectiveFunctionParams = list(caseClass=caseClass, saveModel=saveModel),
+                  direction="maximize",
+                  name="Reclass.Sensitivity")
+}
+
+# Predefined objective calculating the recall
+# of a reclassification experiment, which is the same as
+# the sensitivity of the experiment
+reclassRecall <- function(caseClass, saveModel = FALSE)
+{
+  objective <- reclassSensitivity(caseClass = caseClass, saveModel = saveModel)
+  objective$name <- "Reclass.Recall"
+  return(objective)
+}
+
+# Predefined objective calculating the true positive rate
+# of a reclassification experiment, which is the same as
+# the sensitivity of the experiment
+reclassTruePositive <- function(caseClass, saveModel = FALSE)
+{
+  objective <- reclassSensitivity(caseClass = caseClass, saveModel = saveModel)
+  objective$name <- "Reclass.TruePositive"
+  return(objective)
+}
+
+# Predefined objective calculating the specificity
+# of a reclassification experiment
+reclassSpecificity <- function(caseClass, saveModel=FALSE)
+{
+  createObjective(precalculationFunction = reclassification,
+                  precalculationParams = NULL,
+                  objectiveFunction = function(result, caseClass, saveModel)
+                                      {
+                                        res <- sum(result$predictedLabels[result$trueLabels != caseClass] 
+                                                    != caseClass,na.rm=TRUE) / 
+                                               sum(result$trueLabels != caseClass)
+                                        if (saveModel)
+                                        {
+                                          return(list(additionalData=result$model, fitness=res))
+                                        }
+                                        else
+                                          return(res)                                               
+                                      },
+                  objectiveFunctionParams = list(caseClass=caseClass, saveModel=saveModel),                                      
+                  direction="maximize",
+                  name="Reclass.Specificity")
+}
+
+# Predefined objective calculating the true negative rate
+# of a reclassification experiment, which is the same as
+# the specificity of the experiment
+reclassTrueNegative <- function(caseClass, saveModel = FALSE)
+{
+  objective <- reclassSpecificity(caseClass = caseClass, saveModel = saveModel)
+  objective$name <- "Reclass.TrueNegative"
+  return(objective)
+}
+
+# Predefined objective calculating the fallout
+# of a reclassification experiment
+reclassFallout <- function(caseClass, saveModel = FALSE)
+{
+  createObjective(precalculationFunction = reclassification,
+                  precalculationParams = NULL,
+                  objectiveFunction = function(result, caseClass, saveModel)
+                  {
+                    case <- result$predictedLabels == caseClass
+                    case[is.na(case)] <- TRUE
+                    res <- sum(case[result$trueLabels != caseClass])/sum(result$trueLabels != caseClass)
+                    if (saveModel)
+                    {
+                      return(list(additionalData = result$model, fitness = res))
+                    }
+                    else
+                      return(res)                                           
+                  },
+                  objectiveFunctionParams = list(caseClass = caseClass, saveModel = saveModel),
+                  direction = "minimize",
+                  name = "Reclass.Fallout")
+}
+
+# Predefined objective calculating the false positive rate
+# of a reclassification experiment, which is the same as
+# the fallout of the experiment
+reclassFalsePositive <- function(caseClass, saveModel = FALSE) 
+{
+  objective <- reclassFallout(caseClass = caseClass, saveModel = saveModel)
+  objective$name <- "Reclass.FalsePositive"
+  return(objective)
+}
+
+# Predefined objective calculating the miss rate
+# of a reclassification experiment
+reclassMiss <- function(caseClass, saveModel = FALSE)
+{
+  createObjective(precalculationFunction = reclassification,
+                  precalculationParams = NULL,
+                  objectiveFunction = function(result, caseClass, saveModel)
+                  {
+                    nCase <- result$predictedLabels != caseClass
+                    nCase[is.na(nCase)] <- TRUE
+                    res <- sum(nCase & result$trueLabels == caseClass)/sum(result$trueLabels == caseClass)
+                    if (saveModel)
+                    {
+                      return(list(additionalData = result$model, fitness = res))
+                    }
+                    else
+                      return(res)                                            
+                  },
+                  objectiveFunctionParams = list(caseClass = caseClass, saveModel = saveModel),
+                  direction = "minimize",
+                  name = "Reclass.Miss")
+}
+
+# Predefined objective calculating the false negative rate
+# of a reclassification experiment, which is the same as
+# the miss rate of the experiment
+reclassFalseNegative <- function(caseClass, saveModel = FALSE) 
+{
+  objective <- reclassMiss(caseClass = caseClass, saveModel = saveModel)
+  objective$name <- "Reclass.FalseNegative"
+  return(objective)
+}
+
+# Predefined objective calculating the precision
+# of a reclassification experiment
+reclassPrecision <- function(caseClass, saveModel = FALSE)
+{
+  createObjective(precalculationFunction = reclassification,
+                  precalculationParams = NULL,
+                  objectiveFunction = function(result, caseClass, saveModel)
+                  {
+                    case <- result$predictedLabels == caseClass
+                    case[is.na(case) & !case] <- TRUE
+                    res <- sum(result$predictedLabels == result$trueLabels & result$trueLabels == caseClass, na.rm = TRUE)/sum(case, na.rm = TRUE)
+                    if (saveModel)
+                    {
+                      return(list(additionalData = result$model, fitness = res))
+                    }
+                    else
+                      return(res)
+                  },
+                  objectiveFunctionParams = list(caseClass = caseClass, saveModel = saveModel),
+                  direction = "maximize",
+                  name = "Reclass.Precision")
+}
+
+# Predefined objective calculating the positive predictive value
+# of a reclassification experiment, which is the same as
+# the precision of the experiment
+reclassPPV <- function(caseClass, saveModel = FALSE)
+{
+  objective <- reclassPrecision(caseClass = caseClass, saveModel = saveModel)
+  objective$name <- "Reclass.PPV"
+  return(objective)
+}
+
+# Predefined objective calculating the negative predictive value
+# of a reclassification experiment
+reclassNPV <- function(caseClass, saveModel = FALSE)
+{
+  createObjective(precalculationFunction = reclassification,
+                  precalculationParams = NULL,
+                  objectiveFunction = function(result, caseClass, saveModel)
+                  {
+                    nCase <- result$predictedLabels != caseClass
+                    nCase[is.na(nCase)] <- TRUE
+                    res <- sum(result$predictedLabels != caseClass & result$trueLabels != caseClass, na.rm = TRUE)/ sum(nCase)
+                    if (saveModel)
+                    {
+                      return(list(additionalData = result$model, fitness = res))
+                    }
+                    else
+                      return(res)                                            
+                  },
+                  objectiveFunctionParams = list(caseClass = caseClass, saveModel = saveModel),
+                  direction = "maximize",
+                  name = "Reclass.NPV")
+}
+
+# Predefined objective calculating the confusion of two classes
+# in a reclassification experiment
+reclassConfusion <- function(trueClass, predictedClass, saveModel=FALSE)
+{
+  createObjective(precalculationFunction = reclassification,
+                  precalculationParams = NULL,
+                  objectiveFunction = function(result, trueClass, predictedClass, saveModel)
+                                      {
+                                        res <- sum(result$predictedLabels[result$trueLabels == trueClass]
+                                                    == predictedClass,na.rm=TRUE) / 
+                                               sum(result$trueLabels == trueClass)
+                                        if (saveModel)
+                                        {
+                                          return(list(additionalData=result$model, fitness=res))
+                                        }
+                                        else
+                                          return(res)                                               
+                                      },
+                  objectiveFunctionParams = list(trueClass=trueClass, predictedClass=predictedClass, saveModel=saveModel),
+                  direction="minimize",
+                  name="Reclass.Confusion")
+}
+
+# Predefined objective calculating the accuracy
+# of a cross-validation experiment
+cvAccuracy <- function (nfold = 10, ntimes = 10, leaveOneOut = FALSE, stratified = FALSE, foldList = NULL, saveModel = FALSE) 
+  
+{
+  createObjective(precalculationFunction = crossValidation,
+                  precalculationParams = list(nfold = nfold, ntimes = ntimes, leaveOneOut = leaveOneOut, stratified = stratified, foldList = foldList),
+                  objectiveFunction = function(result, saveModel)
+                  {
+                    numSamples <- sum(sapply(result[[1]], function(fold) length(fold$trueLabels)))
+                    res <- mean(sapply(result, function(run)
+                    {
+                      predictedLabels <- unlist(lapply(run, function(fold) fold$predictedLabels))
+                      trueLabels <- unlist(lapply(run, function(fold) fold$trueLabels))
+                      return(sum(predictedLabels == trueLabels, na.rm = TRUE) / numSamples)
+                    }))
+                    if (saveModel)
+                    {
+                      model <- lapply(result, function(run)
+                      {
+                        lapply(run, function(fold)
+                        {
+                          fold$model
+                        })
+                      })
+                      return(list(additionalData = model, fitness = res))
+                    }
+                    else
+                      return(res)                                            
+                  },
+                  objectiveFunctionParams = list(saveModel = saveModel),
+                  direction = "maximize",
+                  name = "CV.Accuracy")
+}
+
 # Predefined objective calculating the error percentage
 # of a cross-validation experiment
-cvError <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL)
+cvError <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL, saveModel=FALSE)
 {
     createObjective(precalculationFunction = crossValidation,
                     precalculationParams = list(nfold = nfold, 
@@ -309,25 +553,39 @@ cvError <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, 
                                                 leaveOneOut = leaveOneOut,
                                                 stratified = stratified,
                                                 foldList = foldList),
-                    objectiveFunction = function(result)
+                    objectiveFunction = function(result, saveModel)
                                         {
                                           numSamples <- sum(sapply(result[[1]], function(fold)length(fold$trueLabels)))
-                                          return(mean(sapply(result,function(run)
+                                          res <- mean(sapply(result,function(run)
                                                       {
                                                         sum(unlist(lapply(run,function(fold)
                                                         {
                                                           is.na(fold$predictedLabels) | 
                                                           fold$predictedLabels != fold$trueLabels
                                                         })))
-                                                      }))/numSamples)
-                                        },
+                                                      }))/numSamples
+                                          if (saveModel)
+                                          {
+                                            model <- lapply(result,function(run)
+                                                      {
+                                                        lapply(run,function(fold)
+                                                        {
+                                                          fold$model
+                                                        })
+                                                      })
+                                            return(list(additionalData=model, fitness=res))
+                                          }
+                                          else
+                                            return(res)                                                   
+                                          },
+                    objectiveFunctionParams = list(saveModel=saveModel),                                        
                     direction="minimize",
                     name="CV.Error")
 }
 
 # Predefined objective calculating the variance of the error percentage
 # in a cross-validation experiment
-cvErrorVariance<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL)
+cvErrorVariance <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL, saveModel=FALSE)
 {
     createObjective(precalculationFunction = crossValidation,
                     precalculationParams = list(nfold = nfold, 
@@ -335,25 +593,39 @@ cvErrorVariance<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = 
                                                 leaveOneOut = leaveOneOut,
                                                 stratified = stratified,
                                                 foldList = foldList),
-                    objectiveFunction = function(result)
+                    objectiveFunction = function(result, saveModel)
                                         {
                                           numSamples <- sum(sapply(result[[1]], function(fold)length(fold$trueLabels)))
-                                          return(var(sapply(result,function(run)
+                                          res <- var(sapply(result,function(run)
                                                       {
                                                         sum(unlist(lapply(run,function(fold)
                                                         {
                                                           is.na(fold$predictedLabels) | 
                                                           fold$predictedLabels != fold$trueLabels
                                                         })))
-                                                      }))/(numSamples^2))
+                                                      }))/(numSamples^2)
+                                          if (saveModel)
+                                          {
+                                            model <- lapply(result,function(run)
+                                                      {
+                                                        lapply(run,function(fold)
+                                                        {
+                                                          fold$model
+                                                        })
+                                                      })
+                                            return(list(additionalData=model, fitness=res))
+                                          }
+                                          else
+                                            return(res)                                                      
                                         },
+                    objectiveFunctionParams = list(saveModel=saveModel),                                        
                     direction="minimize",
                     name="CV.Error.Var")
 }
 
 # Predefined objective calculating the error percentage
 # of a cross-validation experiment
-cvWeightedError<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL)
+cvWeightedError <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL, saveModel=FALSE)
 {
     createObjective(precalculationFunction = crossValidation,
                     precalculationParams = list(nfold = nfold, 
@@ -361,9 +633,9 @@ cvWeightedError<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = 
                                                 leaveOneOut = leaveOneOut,
                                                 stratified = stratified,
                                                 foldList = foldList),
-                    objectiveFunction = function(result)
+                    objectiveFunction = function(result, saveModel)
                                         {
-                                          return(mean(sapply(result,
+                                          res <- mean(sapply(result,
                                                  function(run)
                                           {
                                             predictedLabels <- unlist(lapply(run,
@@ -379,16 +651,29 @@ cvWeightedError<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = 
                                                 sum(trueLabels == cl)                                                    
                                                 
                                               })) / length(classes)
-                                          })))
+                                          }))                                          
+                                          if (saveModel)
+                                          {
+                                            model <- lapply(result,function(run)
+                                                      {
+                                                        lapply(run,function(fold)
+                                                        {
+                                                          fold$model
+                                                        })
+                                                      })
+                                            return(list(additionalData=model, fitness=res))
+                                          }
+                                          else
+                                            return(res)
                                         },
+                    objectiveFunctionParams = list(saveModel=saveModel),                                        
                     direction="minimize",
                     name="CV.WeightedError")
 }
 
-# Predefined objective calculating the confusion of two classes
-# in a cross-validation experiment
-cvConfusion <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL,
-                        trueClass, predictedClass)
+# Predefined objective calculating the sensitivity
+# of a cross-validation experiment
+cvSensitivity <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL, caseClass, saveModel=FALSE)
 {
   createObjective(precalculationFunction = crossValidation,
                   precalculationParams = list(nfold = nfold, 
@@ -396,9 +681,295 @@ cvConfusion <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FAL
                                               leaveOneOut = leaveOneOut,
                                               stratified = stratified,
                                               foldList = foldList),
-                  objectiveFunction = function(result, trueClass, predictedClass)
+                  objectiveFunction = function(result, caseClass, saveModel)
+                  {
+                    res <- mean(sapply(result,
+                                       function(run)
+                                       {
+                                         predictedLabels <- unlist(lapply(run,
+                                                                          function(fold)fold$predictedLabels))
+                                         trueLabels <- unlist(lapply(run,
+                                                                     function(fold)fold$trueLabels))
+                                         
+                                         return(sum(predictedLabels[trueLabels == caseClass] 
+                                                    == caseClass,na.rm=TRUE) / 
+                                                  sum(trueLabels == caseClass))
+                                       }))
+                    if (saveModel)
+                    {
+                      model <- lapply(result,function(run)
+                      {
+                        lapply(run,function(fold)
+                        {
+                          fold$model
+                        })
+                      })
+                      return(list(additionalData=model, fitness=res))
+                    }
+                    else
+                      return(res)
+                  },
+                  objectiveFunctionParams = list(caseClass=caseClass, saveModel=saveModel),                                        
+                  direction="maximize",
+                  name="CV.Sensitivity")
+}
+
+# Predefined objective calculating the recall
+# of a cross-validation experiment, which is the same as
+# the sensitivity of the experiment
+cvRecall <- function(nfold = 10, ntimes = 10, leaveOneOut = FALSE, stratified = FALSE, foldList = NULL, caseClass, saveModel = FALSE)
+{
+  objective <- cvSensitivity(nfold = nfold, ntimes = ntimes, leaveOneOut = leaveOneOut, stratified = stratified, foldList = foldList, caseClass = caseClass, saveModel = saveModel)
+  objective$name <- "CV.Recall"
+  return(objective)
+}
+
+# Predefined objective calculating the true positive rate
+# of a cross-validation experiment, which is the same as
+# the sensitivity of the experiment
+cvTruePositive <- function (nfold = 10, ntimes = 10, leaveOneOut = FALSE, stratified = FALSE, foldList = NULL, caseClass, saveModel = FALSE)
+{
+  objective <- cvSensitivity(nfold = nfold, ntimes = ntimes, leaveOneOut = leaveOneOut, stratified = stratified, foldList = foldList, caseClass = caseClass, saveModel = saveModel)
+  objective$name <- "CV.TruePositive"
+  return(objective)
+}
+
+# Predefined objective calculating the specificity
+# of a cross-validation experiment
+cvSpecificity <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL, caseClass, saveModel=FALSE)
+{
+  createObjective(precalculationFunction = crossValidation,
+                  precalculationParams = list(nfold = nfold, 
+                                              ntimes = ntimes, 
+                                              leaveOneOut = leaveOneOut,
+                                              stratified = stratified,
+                                              foldList = foldList),
+                  objectiveFunction = function(result, caseClass, saveModel)
+                  {
+                    res <- mean(sapply(result,
+                                       function(run)
+                                       {
+                                         predictedLabels <- unlist(lapply(run,
+                                                                          function(fold)fold$predictedLabels))
+                                         trueLabels <- unlist(lapply(run,
+                                                                     function(fold)fold$trueLabels))
+                                         return(sum(predictedLabels[trueLabels != caseClass] 
+                                                    != caseClass,na.rm=TRUE) / 
+                                                  sum(trueLabels != caseClass))
+                                       }))
+                    if (saveModel)
+                    {
+                      model <- lapply(result,function(run)
+                      {
+                        lapply(run,function(fold)
+                        {
+                          fold$model
+                        })
+                      })
+                      return(list(additionalData=model, fitness=res))
+                    }
+                    else
+                      return(res)
+                  },
+                  objectiveFunctionParams = list(caseClass=caseClass, saveModel=saveModel),                                        
+                  direction="maximize",
+                  name="CV.Specificity")
+}
+
+# Predefined objective calculating the true negative rate
+# of a cross-validation experiment, which is the same as
+# the specificity of the experiment
+cvTrueNegative <- function (nfold = 10, ntimes = 10, leaveOneOut = FALSE, stratified = FALSE, foldList = NULL, caseClass, saveModel = FALSE)
+{
+  objective <- cvSpecificity(nfold = nfold, ntimes = ntimes, leaveOneOut = leaveOneOut, stratified = stratified, foldList = foldList, caseClass = caseClass, saveModel = saveModel)
+  objective$name <- "CV.TrueNegative"
+  return(objective)
+}
+
+# Predefined objective calculating the fallout
+# of a cross-validation experiment
+cvFallout <- function(nfold = 10, ntimes = 10, leaveOneOut = FALSE, stratified = FALSE, foldList = NULL, caseClass, saveModel = FALSE)
+{
+  createObjective(precalculationFunction = crossValidation,
+                  precalculationParams = list(nfold = nfold, ntimes = ntimes, leaveOneOut = leaveOneOut, stratified = stratified, foldList = foldList),
+                  objectiveFunction = function(result, caseClass, saveModel)
+                  {
+                    res <-mean(sapply(result, function(run)
+                    {
+                      predictedLabels <- unlist(lapply(run, function(fold) fold$predictedLabels))
+                      trueLabels <- unlist(lapply(run, function(fold) fold$trueLabels))                                               
+                      case <- predictedLabels == caseClass
+                      case[is.na(case)] <- TRUE
+                      return(sum(case[trueLabels != caseClass])/sum(trueLabels != caseClass))
+                    }))
+                    if (saveModel)
+                    {
+                      model <- lapply(result, function(run)
+                      {
+                        lapply(run, function(fold)
+                        {
+                          fold$model
+                        })
+                      })
+                      return(list(additionalData = model, fitness = res))
+                    }
+                    else
+                      return(res)                                            
+                  },
+                  objectiveFunctionParams = list(caseClass = caseClass, saveModel = saveModel),
+                  direction = "minimize",
+                  name = "CV.Fallout")
+}
+
+# Predefined objective calculating the false positive rate
+# of a cross-validation experiment, which is the same as
+# the fallout of the experiment
+cvFalsePositive <- function(nfold = 10, ntimes = 10, leaveOneOut = FALSE, stratified = FALSE, foldList = NULL, caseClass, saveModel = FALSE)
+{
+  objective <- cvFallout(nfold = 10, ntimes = 10, leaveOneOut = FALSE, stratified = FALSE, foldList = NULL, caseClass, saveModel = saveModel)
+  objective$name <- "CV.FalsePositive"
+  return(objective)
+}
+
+# Predefined objective calculating the miss rate
+# of a cross-validation experiment
+cvMiss <- function(nfold = 10, ntimes = 10, leaveOneOut = FALSE, stratified = FALSE, foldList = NULL, caseClass, saveModel = FALSE)
+{
+  createObjective(precalculationFunction = crossValidation,
+                  precalculationParams = list(nfold = nfold, ntimes = ntimes, leaveOneOut = leaveOneOut, stratified = stratified, foldList = foldList),
+                  objectiveFunction = function(result, caseClass, saveModel)
+                  {
+                    res <- mean(sapply(result, function(run)
+                    {
+                      predictedLabels <- unlist(lapply(run, function(fold) fold$predictedLabels))
+                      trueLabels <- unlist(lapply(run, function(fold) fold$trueLabels))
+                      nCase <- predictedLabels != caseClass
+                      nCase[is.na(nCase)] <- TRUE
+                      return(sum(nCase & trueLabels == caseClass)/sum(trueLabels == caseClass))
+                    }))
+                    if (saveModel)
+                    {
+                      model <- lapply(result, function(run)
+                      {
+                        lapply(run, function(fold)
+                        {
+                          fold$model
+                        })
+                      })
+                      return(list(additionalData = model, fitness = res))
+                    }
+                    else
+                      return(res)                                            
+                  },
+                  objectiveFunctionParams = list(caseClass = caseClass, saveModel = saveModel),
+                  direction = "minimize",
+                  name = "CV.Miss")
+}
+
+# Predefined objective calculating the false negative rate
+# of a cross-validation experiment, which is the same as
+# the miss rate of the experiment
+cvFalseNegative <- function(nfold = 10, ntimes = 10, leaveOneOut = FALSE, stratified = FALSE, foldList = NULL, caseClass, saveModel = FALSE)
+{
+  objective <- cvMiss(nfold = 10, ntimes = 10, leaveOneOut = FALSE, stratified = FALSE, foldList = NULL, caseClass = caseClass, saveModel = saveModel)
+  objective$name <- "CV.FalseNegative"
+  return(objective)
+}
+
+# Predefined objective calculating the precision
+# of a cross-validation experiment
+cvPrecision <- function(nfold = 10, ntimes = 10, leaveOneOut = FALSE, stratified = FALSE, foldList = NULL, caseClass, saveModel = FALSE)
+{
+  createObjective(precalculationFunction = crossValidation,
+                  precalculationParams = list(nfold = nfold, ntimes = ntimes, leaveOneOut = leaveOneOut, stratified = stratified, foldList = foldList),
+                  objectiveFunction = function(result, caseClass, saveModel)
+                  {
+                    res <- mean(sapply(result, function(run)
+                    {
+                      predictedLabels <- unlist(lapply(run, function(fold) fold$predictedLabels))
+                      trueLabels <- unlist(lapply(run, function(fold) fold$trueLabels))
+                      case <- predictedLabels == caseClass
+                      case[is.na(case) & !case] <- TRUE
+                      return(sum(predictedLabels == trueLabels & trueLabels == caseClass, na.rm = TRUE)/sum(case, na.rm = TRUE))
+                    }))
+                    if (saveModel)
+                    {
+                      model <- lapply(result, function(run)
+                      {
+                        lapply(run, function(fold)
+                        {
+                          fold$model
+                        })
+                      })
+                      return(list(additionalData = model, fitness = res))
+                    }
+                    else
+                      return(res)                                            
+                  },
+                  objectiveFunctionParams = list(caseClass = caseClass, saveModel = saveModel),
+                  direction = "maximize",
+                  name = "CV.Precision")
+}
+
+# Predefined objective calculating the positive predictive value
+# of a cross-validation experiment, which is the same as
+# the precision of the experiment
+cvPPV <- function(nfold = 10, ntimes = 10, leaveOneOut = FALSE, stratified = FALSE, foldList = NULL, caseClass, saveModel = FALSE)
+{
+  objective <- cvPrecision(nfold = nfold, ntimes = ntimes, leaveOneOut = leaveOneOut, stratified = stratified, foldList = foldList, caseClass, saveModel = saveModel)
+  objective$name <- "CV.PPV"
+  return(objective)
+}
+
+# Predefined objective calculating the negative predictive value
+# of a cross-validation experiment
+cvNPV <- function(nfold = 10, ntimes = 10, leaveOneOut = FALSE, stratified = FALSE, foldList = NULL, caseClass, saveModel = FALSE)
+{
+  createObjective(precalculationFunction = crossValidation,
+                  precalculationParams = list(nfold = nfold, ntimes = ntimes, leaveOneOut = leaveOneOut, stratified = stratified, foldList = foldList),
+                  objectiveFunction = function(result, caseClass, saveModel)
+                  {
+                    res <- mean(sapply(result, function(run)
+                    {
+                      predictedLabels <- unlist(lapply(run, function(fold) fold$predictedLabels))
+                      trueLabels <- unlist(lapply(run, function(fold) fold$trueLabels))
+                      nCase <- predictedLabels != caseClass
+                      nCase[is.na(nCase)] <- TRUE            
+                      return(sum(predictedLabels != caseClass & trueLabels != caseClass, na.rm = TRUE)/ sum(nCase))
+                    }))
+                    if (saveModel)
+                    {
+                      model <- lapply(result, function(run)
+                      {
+                        lapply(run, function(fold)
+                        {
+                          fold$model
+                        })
+                      })
+                      return(list(additionalData = model, fitness = res))
+                    }
+                    else
+                      return(res)                                            
+                  },
+                  objectiveFunctionParams = list(caseClass = caseClass, saveModel = saveModel),
+                  direction = "maximize",
+                  name = "CV.NPV")
+}
+
+# Predefined objective calculating the confusion of two classes
+# in a cross-validation experiment
+cvConfusion <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL,
+                        trueClass, predictedClass, saveModel=FALSE)
+{
+  createObjective(precalculationFunction = crossValidation,
+                  precalculationParams = list(nfold = nfold, 
+                                              ntimes = ntimes, 
+                                              leaveOneOut = leaveOneOut,
+                                              stratified = stratified,
+                                              foldList = foldList),
+                  objectiveFunction = function(result, trueClass, predictedClass, saveModel)
                                       {
-                                        return(mean(sapply(result,
+                                        res <- mean(sapply(result,
                                                  function(run)
                                                       {
                                                         predictedLabels <- unlist(lapply(run,
@@ -409,70 +980,23 @@ cvConfusion <- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FAL
                                                         return(sum(predictedLabels[trueLabels == trueClass]
                                                                    == predictedClass,na.rm=TRUE) / 
                                                                sum(trueLabels == trueClass))
-                                                      })))
+                                                      }))
+                                          if (saveModel)
+                                          {
+                                            model <- lapply(result,function(run)
+                                                      {
+                                                        lapply(run,function(fold)
+                                                        {
+                                                          fold$model
+                                                        })
+                                                      })
+                                            return(list(additionalData=model, fitness=res))
+                                          }
+                                          else
+                                            return(res)
  
                                       },
-                  objectiveFunctionParams = list(trueClass=trueClass, predictedClass=predictedClass),
+                  objectiveFunctionParams = list(trueClass=trueClass, predictedClass=predictedClass, saveModel=saveModel),
                   direction="minimize",
                   name="CV.Confusion")
 }
-
-# Predefined objective calculating the sensitivity
-# of a cross-validation experiment
-cvSensitivity<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL, caseClass)
-{
-    createObjective(precalculationFunction = crossValidation,
-                    precalculationParams = list(nfold = nfold, 
-                                                ntimes = ntimes, 
-                                                leaveOneOut = leaveOneOut,
-                                                stratified = stratified,
-                                                foldList = foldList),
-                    objectiveFunction = function(result, caseClass)
-                                        {
-                                          return(mean(sapply(result,
-                                                 function(run)
-                                                      {
-                                                        predictedLabels <- unlist(lapply(run,
-                                                                                  function(fold)fold$predictedLabels))
-                                                        trueLabels <- unlist(lapply(run,
-                                                                             function(fold)fold$trueLabels))
-                                                        
-                                                        return(sum(predictedLabels[trueLabels == caseClass] 
-                                                                   == caseClass,na.rm=TRUE) / 
-                                                               sum(trueLabels == caseClass))
-                                                      })))
-                                        },
-                    objectiveFunctionParams = list(caseClass=caseClass),                                        
-                    direction="maximize",
-                    name="CV.Sensitivity")
-}
-
-# Predefined objective calculating the specificity
-# of a cross-validation experiment
-cvSpecificity<- function(nfold=10, ntimes=10, leaveOneOut=FALSE, stratified = FALSE, foldList=NULL, caseClass)
-{
-    createObjective(precalculationFunction = crossValidation,
-                    precalculationParams = list(nfold = nfold, 
-                                                ntimes = ntimes, 
-                                                leaveOneOut = leaveOneOut,
-                                                stratified = stratified,
-                                                foldList = foldList),
-                    objectiveFunction = function(result, caseClass)
-                                        {
-                                          return(mean(sapply(result,
-                                                 function(run)
-                                                      {
-                                                        predictedLabels <- unlist(lapply(run,
-                                                                                  function(fold)fold$predictedLabels))
-                                                        trueLabels <- unlist(lapply(run,
-                                                                             function(fold)fold$trueLabels))
-                                                        return(sum(predictedLabels[trueLabels != caseClass] 
-                                                                   != caseClass,na.rm=TRUE) / 
-                                                               sum(trueLabels != caseClass))
-                                                      })))
-                                        },
-                    objectiveFunctionParams = list(caseClass=caseClass),                                        
-                    direction="maximize",
-                    name="CV.Specificity")
-}
-

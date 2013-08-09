@@ -66,6 +66,7 @@ This function does not have a return value.
 \code{\link{tunePareto}}, \code{\link{plotParetoFronts2D}}, \code{\link{plotDominationGraph}}
 }
 \examples{
+\donttest{
 # optimize the 'cost' parameter of an SVM according
 # to CV error, CV error variance, and CV Specificity 
 # on two classes of the 'iris' data set
@@ -78,7 +79,8 @@ r <- tunePareto(data = iris[, -ncol(iris)],
                                         cvSpecificity(10, 10, caseClass="virginica")))
 
 # plot the matrix of Pareto fronts
-plotObjectivePairs(r)         
+plotObjectivePairs(r)
+}
 }
 
 \keyword{multi-objective optimization

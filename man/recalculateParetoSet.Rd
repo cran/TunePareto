@@ -27,6 +27,7 @@ Returns a reduced \code{TuneParetoResult} object. For more details on the object
 \code{\link{tunePareto}}, \code{\link{mergeTuneParetoResults}}
 }
 \examples{
+\donttest{
 # optimize the 'cost' parameter of an SVM on
 # the 'iris' data set
 res <- tunePareto(classifier = tunePareto.svm(),
@@ -39,6 +40,7 @@ res <- tunePareto(classifier = tunePareto.svm(),
 print(res)
 
 # select only specificity and sensitivity
-print(recalculateParetoSet(res, 2:3))                                
+print(recalculateParetoSet(res, 2:3))
+}
 }
 \keyword{subset of objectives}
