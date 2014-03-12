@@ -1,6 +1,18 @@
 \name{NEWS}
 \title{NEWS file for the \pkg{TunePareto} package}
 
+\section{Changes in version 2.4}{
+
+\subsection{Modified functions}{
+
+\itemize{
+
+\item{Fix in predict.TuneParetoModel preventing returning empty prediction vectors.}
+
+}
+}
+}
+
 \section{Changes in version 2.3}{
 
 \subsection{New functions}{

@@ -236,7 +236,11 @@ predict.TuneParetoModel <- function(object, newdata, ...)
     paramList <- c(paramList, as.list(object$classifierParams))
     
     # call classifier and return predicted labels
-    return(do.call(object$classifier$classifier, paramList))
+    res <- do.call(object$classifier$classifier, paramList)
+    if (length(res) != nrow(newdata))
+      stop("The length of the prediction vector does not coincide with the number of samples!")
+    else
+      return(res)  
   }
   else
   # separate training and prediction
@@ -248,7 +252,11 @@ predict.TuneParetoModel <- function(object, newdata, ...)
     paramList <- c(paramList, args)
     
     # predict the unknown samples
-    return(do.call(object$classifier$predictor, paramList))
+    res <- do.call(object$classifier$predictor, paramList)
+    if (length(res) != nrow(newdata))
+      stop("The length of the prediction vector does not coincide with the number of samples!")
+    else
+      return(res)    
   } 
 }
 

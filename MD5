@@ -1,6 +1,6 @@
-dfa0b033dcb77e4fad9e4c4918a27b45 *DESCRIPTION
+1f82b18ef739d800b7c2aaf9ae089720 *DESCRIPTION
 9d527854a2e9757a74a9d78604bcdfcd *NAMESPACE
-4d35527a12740791425f695dfe6cb2b1 *R/classifiers.R
+51c870f9ebd63b80c19ab92f03e3c754 *R/classifiers.R
 44711dd33d69137ddae36288a4313b0a *R/desirability.R
 3db2b39b18f15b3ce40b41904b6b7e6c *R/helpers.R
 6692a80d3c398b53bef59580cdadfe6b *R/objectiveFunctions.R
@@ -8,8 +8,8 @@ dfa0b033dcb77e4fad9e4c4918a27b45 *DESCRIPTION
 0eda43bd0399d5e7fb181551d6ddd8bb *R/tunePareto.R
 e6948a41c93c67c51f04dd6a905cc9ae *R/visualizations.R
 d10699a389b50866af28cec47563be3b *inst/CITATION
-6ea06d915a2c0ab59826e936029aa02b *inst/NEWS.Rd
-717024d10e90c611dba832997c4a1b2b *man/TunePareto-package.Rd
+293c17a8792af20967c4b53219a64261 *inst/NEWS.Rd
+9d07f4dd68b5867e5924680fe366e905 *man/TunePareto-package.Rd
 44388f9a4cad2b5ad299c2aadc08c80f *man/allCombinations.Rd
 a4b59d8f7bc0d162d6fd51f7a579f598 *man/as.interval.Rd
 9df4759832b81c07af2d50d11ffbb230 *man/createObjective.Rd
