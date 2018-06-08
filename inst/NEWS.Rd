@@ -1,6 +1,18 @@
 \name{NEWS}
 \title{NEWS file for the \pkg{TunePareto} package}
 
+\section{Changes in version 2.5}{
+
+\subsection{Modified functions export}{
+
+\itemize{
+
+\item{Fix in exporting predict.TuneParetoModel.}
+
+}
+}
+}
+
 \section{Changes in version 2.4}{
 
 \subsection{Modified functions}{

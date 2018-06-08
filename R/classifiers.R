@@ -120,7 +120,7 @@ tunePareto.svm <- function()
 tunePareto.NaiveBayes <- function()
 {
    return(tuneParetoClassifier(name = "NaiveBayes",
-                               classifier = NaiveBayes,
+                               classifier = klaR::NaiveBayes,
                                predictor  = function(object, newdata, ...)
                                             {
                                               predict(object, newdata, ...)$class

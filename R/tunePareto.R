@@ -9,7 +9,7 @@
 # Returns a Boolean domination matrix.
 calculateDominationMatrix <- function(objectiveValues, minimizeObjectives)
 {
-  domination <- .Call("calculateDominationMatrix",as.numeric(as.matrix(objectiveValues)), as.integer(minimizeObjectives))
+  domination <- .Call("calculateDominationMatrixC",as.numeric(as.matrix(objectiveValues)), as.integer(minimizeObjectives))
   rownames(domination) <- rownames(objectiveValues)              
   colnames(domination) <- rownames(objectiveValues)
   return(domination)  
@@ -63,14 +63,12 @@ tunePareto <- function(..., data, labels,
       
   if (useSnowfall)
   {
-     require(snowfall)
-    
     # export libraries needed in the cluster
-    sfLibrary("snowfall", character.only=TRUE)
-    sfLibrary("TunePareto", character.only=TRUE)
+    snowfall::sfLibrary("snowfall", character.only=TRUE)
+    snowfall::sfLibrary("TunePareto", character.only=TRUE)
     
     if (length(classifier$requiredPackages) > 0)
-      lapply(classifier$requiredPackages,function(package)sfLibrary(package, character.only=TRUE))
+      lapply(classifier$requiredPackages,function(package)snowfall::sfLibrary(package, character.only=TRUE))
   }
   
   labels <- as.factor(as.character(labels))
@@ -283,11 +281,11 @@ tunePareto <- function(..., data, labels,
     if (useSnowfall)
     { 
       # export objects and functions needed in the cluster   
-      sfExport("data","labels","classifier","keepSeed","seed",
+      snowfall::sfExport("data","labels","classifier","keepSeed","seed",
                "groupedObjectives","useSnowfall","verbose","meaningfulParams")
       
       # parallel evaluation of combinations in cluster
-      ov <- sfLapply(individuals, function(cand)calculateObjectiveVals(cand$individual))
+      ov <- snowfall::sfLapply(individuals, function(cand)calculateObjectiveVals(cand$individual))
     }
     else
     {
@@ -332,11 +330,11 @@ tunePareto <- function(..., data, labels,
       if (useSnowfall)
       { 
         # export objects and functions needed in the cluster   
-        sfExport("data","labels","classifier","keepSeed","seed",
+        snowfall::sfExport("data","labels","classifier","keepSeed","seed",
                  "groupedObjectives","useSnowfall","verbose","meaningfulParams")
                          
         # parallel evaluation of combinations in cluster
-        ov <- sfLapply(candidates, function(cand)calculateObjectiveVals(cand$individual))
+        ov <- snowfall::sfLapply(candidates, function(cand)calculateObjectiveVals(cand$individual))
 
       }
       else
@@ -397,11 +395,11 @@ tunePareto <- function(..., data, labels,
     if (useSnowfall)
     { 
       # export objects and functions needed in the cluster   
-      sfExport("data","labels","classifier","keepSeed","seed",
+      snowfall::sfExport("data","labels","classifier","keepSeed","seed",
                "groupedObjectives","useSnowfall","verbose","meaningfulParams")
                
       # parallel evaluation of combinations in cluster
-      ov <- sfLapply(combinations, calculateObjectiveVals)
+      ov <- snowfall::sfLapply(combinations, calculateObjectiveVals)
     }
     else
     {

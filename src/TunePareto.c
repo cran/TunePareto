@@ -2,7 +2,7 @@
 #include <Rinternals.h>
 #include <stdbool.h>
 
-SEXP calculateDominationMatrix(SEXP objectiveValues, SEXP minimizeObjectives)
+SEXP calculateDominationMatrixC(SEXP objectiveValues, SEXP minimizeObjectives)
 {
   unsigned int numObjectives = length(minimizeObjectives);
   unsigned int numCombinations = length(objectiveValues)/numObjectives;

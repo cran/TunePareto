@@ -80,21 +80,19 @@ sampleCombinations <- function(parameterRanges, N, method=c("uniform","halton","
                     uniform = runif(n=length(parameterRanges)*N),
                     halton = halton.sample(n=N, dimension=length(parameterRanges)),
                     niederreiter = {
-                                      require(gsl)
-                                      pt <- qrng_alloc(type="niederreiter_2",dim=length(parameterRanges))
+                                      pt <- gsl::qrng_alloc(type="niederreiter_2",dim=length(parameterRanges))
                                       
                                       # random initialization
-                                      qrng_get(pt,sample(1:1000,size=1))
-                                      t(qrng_get(pt, N))
+                                      gsl::qrng_get(pt,sample(1:1000,size=1))
+                                      t(gsl::qrng_get(pt, N))
                                       
                                    },
                     sobol =        {
-                                      require(gsl)
-                                      pt <- qrng_alloc(type="sobol",dim=length(parameterRanges))
+                                      pt <- gsl::qrng_alloc(type="sobol",dim=length(parameterRanges))
                                       
                                       # random initialization
-                                      qrng_get(pt,sample(1:1000,size=1))
-                                      t(qrng_get(pt, N))
+                                      gsl::qrng_get(pt,sample(1:1000,size=1))
+                                      t(gsl::qrng_get(pt, N))
                                    }                                   
                    )
   numbers <- matrix(numbers,ncol=N)

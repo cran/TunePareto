@@ -59,8 +59,6 @@ plotDominationGraph <- function(tuneParetoResult,
   if(!inherits(tuneParetoResult, "TuneParetoResult"))
     stop("\"tuneParetoResult\" must be a TuneParetoResult object!")
   
-  require(igraph)
-  
   if (missing(col.indicator))
       colorSet <- c("blue","green","red","darkgoldenrod","gold","brown","cyan",
         "purple","orange","seagreen","tomato","darkgray","chocolate",
@@ -111,7 +109,7 @@ plotDominationGraph <- function(tuneParetoResult,
   paretoFronts <- calculateParetoFronts(mat)$paretoFronts
   
   # create igraph object
-  g <- graph.adjacency(t(edges), mode="directed")
+  g <- igraph::graph.adjacency(t(edges), mode="directed")
   
   dim_y <- 10
   
@@ -177,7 +175,7 @@ plotDominationGraph <- function(tuneParetoResult,
   do.call(plot,c(list(x=g),args,list(layout=positions[1:nrow(edges),,drop=FALSE])))
     
   # normalize layout
-  positions <- layout.norm(positions,-1, 1, -1, 1)
+  positions <- igraph::layout.norm(positions,-1, 1, -1, 1)
 
   cols <- c()
   pchs <- c()
