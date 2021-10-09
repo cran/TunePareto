@@ -85,6 +85,4 @@ x <- tunePareto(data = iris[, -ncol(iris)],
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
-\keyword{Pareto front
-         domination graph
-         objective function}
+\keyword{Pareto front domination graph objective function}

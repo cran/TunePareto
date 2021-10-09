@@ -124,6 +124,4 @@ r <- tunePareto(data = iris[, -ncol(iris)],
 
 print(r)
 }
-\keyword{objective function
-         multi-objective optimization
-         MOO}
+\keyword{objective function multi-objective optimization MOO}

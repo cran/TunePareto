@@ -126,9 +126,4 @@ print(tunePareto(classifier = tunePareto.NaiveBayes(),
 }
 }
 
-\keyword{TuneParetoClassifier,
-         knn
-         svm
-         tree
-         randomForest
-         NaiveBayes}
+\keyword{TuneParetoClassifier knn svm tree randomForest NaiveBayes}

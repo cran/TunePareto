@@ -11,12 +11,12 @@ citEntry(entry = "Article",
   volume       = "46",
   number       = "5",
   pages        = "1--27",
-  url          = "http://www.jstatsoft.org/v46/i05/",
+  doi          = "10.18637/jss.v046.i05",
 
   textVersion  =
   paste("Christoph Müssel, Ludwig Lausser, Markus Maucher, Hans A. Kestler (2012).",
         "Multi-Objective Parameter Selection for Classifiers.",
         "Journal of Statistical Software, 46(5), 1-27.",
-        "URL http://www.jstatsoft.org/v46/i05/.")
+        "DOI https://doi.org/10.18637/jss.v046.i05.")
 )
 

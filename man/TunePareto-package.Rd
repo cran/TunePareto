@@ -32,11 +32,10 @@ Maintainer: Hans Kestler <hans.kestler@uni-ulm.de>
 }
 
 \references{
-Christoph Müssel, Ludwig Lausser, Markus Maucher, Hans A. Kestler (2012). Multi-Objective Parameter Selection for Classifiers. Journal of Statistical Software, 46(5), 1-27. URL http://www.jstatsoft.org/v46/i05/.
+Christoph Müssel, Ludwig Lausser, Markus Maucher, Hans A. Kestler (2012). Multi-Objective Parameter Selection for Classifiers. Journal of Statistical Software, 46(5), 1-27. DOI https://doi.org/10.18637/jss.v046.i05.
 }
 
-\keyword{package
-         multi-objective parameter tuning}
+\keyword{multi-objective parameter tuning}
 
 \examples{
 \donttest{

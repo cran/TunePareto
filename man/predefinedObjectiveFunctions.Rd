@@ -194,6 +194,4 @@ print(tunePareto(data = iris[, -ncol(iris)],
                  objectiveFunctions = objectiveFunctions))
 }
 
-\keyword{objective function
-         multi-objective optimization
-         MOO}
+\keyword{objective function multi-objective optimization MOO}

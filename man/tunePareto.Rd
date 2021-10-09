@@ -169,8 +169,4 @@ print(tunePareto(data = iris[, -ncol(iris)],
                                            cvSpecificity(10, 10, caseClass="setosa"))))}
 }
 }
-\keyword{parameter tuning
-         multi-objective optimization
-         MOO
-         parallel
-         multi-core}
+\keyword{parameter tuning multi-objective optimization MOO parallel multi-core}

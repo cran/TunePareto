@@ -85,6 +85,4 @@ r <- tunePareto(data = iris[, -ncol(iris)],
 plotParetoFronts2D(r)
 }
 }
-\keyword{multi-objective optimization
-         MOO
-         Pareto front}
+\keyword{multi-objective optimization MOO Pareto front}

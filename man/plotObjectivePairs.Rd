@@ -83,6 +83,4 @@ plotObjectivePairs(r)
 }
 }
 
-\keyword{multi-objective optimization
-         MOO
-         Pareto front}
+\keyword{multi-objective optimization MOO Pareto front}
