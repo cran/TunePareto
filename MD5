@@ -1,4 +1,4 @@
-f36627965250e4ff1a62421202f4076b *DESCRIPTION
+906ad0dc1afdec14d35632b8f7e441c0 *DESCRIPTION
 49ee028cfef682c85f2c345832039d56 *NAMESPACE
 12c90f2fc9ffa19b78b42d8e803b12bd *R/classifiers.R
 44711dd33d69137ddae36288a4313b0a *R/desirability.R
@@ -23,7 +23,7 @@ bcdcaaab750b408b195e2632d707d8dd *man/mergeTuneParetoResults.Rd
 eb5d36c8b4fa4ee099100cf0137ac935 *man/predefinedObjectiveFunctions.Rd
 ec8d14a7ec1c77632913afc9a828c2b0 *man/predict.TuneParetoModel.Rd
 f27d3ff6b159a26fa1daf16bb16753c1 *man/print.TuneParetoResult.Rd
-d0e7b62489abdeda395ea336477d3c51 *man/rankByDesirability.Rd
+668e8676b5df58ca49e8caa831c6be44 *man/rankByDesirability.Rd
 6c7f14d92168f1d6cf4a1281c0ca4161 *man/recalculateParetoSet.Rd
 5c2b406126cedd5081169fd6d1e5ed08 *man/trainTuneParetoClassifier.Rd
 76efd97b01c944eb36ae9115cd15eeb6 *man/tunePareto.Rd
