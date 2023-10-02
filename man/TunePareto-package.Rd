@@ -9,14 +9,7 @@ Multi-objective parameter tuning for classifiers
 Generic methods for parameter tuning of classification algorithms using multiple scoring functions
 }
 \details{
-\tabular{ll}{
-Package: \tab TunePareto\cr
-Type: \tab Package\cr
-Version: \tab 2.5\cr
-Date: \tab 2018-06-08\cr
-License: \tab GPL-2 \cr
-LazyLoad: \tab yes\cr
-}
+
 The methods of this package allow to assess the performance of classifiers with respect to certain parameter values and multiple scoring functions, such as the cross-validation error or the sensitivity. It provides the \code{\link{tunePareto}} function which can be configured to run most common classification methods implemented in R. Several sampling strategies for parameters are supplied, including Latin Hypercube sampling, quasi-random sequences, and evolutionary algorithms.
 
 Classifiers are wrapped in generic \code{TuneParetoClassifier} objects which can be created using \code{\link{tuneParetoClassifier}}. For state-of-the-art classifiers, the package includes the corresponding wrapper objects (see \code{\link{tunePareto.knn}}, \code{\link{tunePareto.tree}}, \code{\link{tunePareto.randomForest}}, \code{\link{tunePareto.svm}}, \code{\link{tunePareto.NaiveBayes}}). 

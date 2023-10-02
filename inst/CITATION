@@ -1,8 +1,8 @@
 citHeader("To cite TunePareto in publications use:")
 
-citEntry(entry = "Article",
+bibentry(bibtype = "Article",
   title        = "Multi-Objective Parameter Selection for Classifiers",
-  author       = personList(as.person("Christoph M\\\"ussel"),
+  author       = c(as.person("Christoph M\\\"ussel"),
                    as.person("Ludwig Lausser"),
                    as.person("Markus Maucher"),
                    as.person("Hans A. Kestler")),
